@@ -21,10 +21,12 @@ class PDFDownloader:
         storage_manager: Optional[PDFStorageManager] = None,
         timeout: float = 30.0,
         max_retries: int = 3,
+        max_storage_bytes: int = 50 * 1024 * 1024,
     ):
         self.storage = storage_manager or PDFStorageManager()
         self.timeout = timeout
         self.max_retries = max_retries
+        self.max_storage_bytes = max_storage_bytes
 
     async def download_pdf(
         self,
@@ -76,6 +78,10 @@ class PDFDownloader:
                     dest_path.parent.mkdir(parents=True, exist_ok=True)
                     with open(dest_path, "wb") as f:
                         f.write(pdf_bytes)
+
+                    # Enforce disk storage quota (LRU eviction)
+                    if self.max_storage_bytes > 0:
+                        self.storage.enforce_storage_limit(self.max_storage_bytes)
 
                     meta.download_status = "downloaded"
                     meta.download_timestamp = datetime.now(timezone.utc).isoformat()

@@ -1,5 +1,6 @@
 """MCP tools and resources registration for DIU Question MCP Server."""
 
+import base64
 import json
 import logging
 from typing import List, Union, Optional, Dict, Any
@@ -7,6 +8,7 @@ from mcp.server.mcpserver import MCPServer
 import mcp.types as types
 from config import SERVER_NAME
 from services.collection_service import CollectionService
+from services.preview_service import PreviewService
 from mcp_server.resources import read_pdf_resource, read_collection_resource
 
 logger = logging.getLogger("diu_mcp.mcp_server.tools")
@@ -16,6 +18,7 @@ def create_mcp_server(service: Optional[CollectionService] = None) -> MCPServer:
     """Create and configure the MCPServer with all tools and resources."""
     app = MCPServer(SERVER_NAME)
     svc = service or CollectionService()
+    preview_svc = PreviewService(repo=svc.repo)
 
     # -------------------------------------------------------------
     # Tool 1: list_departments
@@ -226,6 +229,53 @@ def create_mcp_server(service: Optional[CollectionService] = None) -> MCPServer:
         if not summary:
             raise ValueError(f"Collection ID '{collection_id}' not found.")
         return summary
+
+    # -------------------------------------------------------------
+    # Tool 10: preview_question_page
+    # -------------------------------------------------------------
+    @app.tool(
+        name="preview_question_page",
+        description=(
+            "Render an original question paper page as a high-resolution PNG image. "
+            "Essential for multimodal AI models (Claude, ChatGPT, Cursor) to visually inspect "
+            "diagrams, circuits, flowcharts, graphs, mathematical equations, and handwritten exam sheets. "
+            "Works completely in-memory without wasting disk space."
+        ),
+    )
+    async def preview_question_page(
+        file_id: str,
+        page_number: int = 1,
+    ) -> List[Union[types.TextContent, types.ImageContent]]:
+        """Renders page as PNG image and returns both metadata and ImageContent."""
+        png_bytes, p_num, total_pages = await preview_svc.get_page_png_bytes(
+            file_id=file_id, page_number=page_number, scale=2.0
+        )
+        base64_data = base64.b64encode(png_bytes).decode("ascii")
+
+        meta = svc.get_pdf_metadata(file_id)
+        course_label = meta.course_name if meta else file_id
+        sem_label = f" ({meta.semester} {meta.exam_type})" if meta else ""
+        caption = f"Page {p_num} of {total_pages} for {course_label}{sem_label}"
+
+        return [
+            types.TextContent(
+                type="text",
+                text=json.dumps({
+                    "file_id": file_id,
+                    "page_number": p_num,
+                    "total_pages": total_pages,
+                    "caption": caption,
+                    "image_format": "image/png",
+                    "resolution": "High-DPI (scale 2.0)",
+                    "message": "Question page rendered successfully. Visual diagram/image attached below."
+                }, indent=2)
+            ),
+            types.ImageContent(
+                type="image",
+                data=base64_data,
+                mimeType="image/png"
+            )
+        ]
 
     # -------------------------------------------------------------
     # Resource: diu-question://pdf/{file_id}

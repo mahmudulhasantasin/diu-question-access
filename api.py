@@ -12,14 +12,15 @@ from contextlib import asynccontextmanager
 import logging
 from pathlib import Path
 from typing import List, Union, Optional, Dict, Any
-from fastapi import FastAPI, HTTPException, Query, status
+from fastapi import FastAPI, HTTPException, Query, Response, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from config import SERVER_NAME, SERVER_VERSION, LOG_LEVEL
 from database.models import CollectionSummary
 from services.collection_service import CollectionService
+from services.preview_service import PreviewService
 from mcp_server.tools import create_mcp_server
 
 logger = logging.getLogger("diu_mcp.api")
@@ -51,6 +52,7 @@ class HealthResponse(BaseModel):
 def create_app() -> FastAPI:
     """Create configured production FastAPI application."""
     service = CollectionService()
+    preview_service = PreviewService(repo=service.repo)
     mcp_app_instance = create_mcp_server(service=service)
 
     @asynccontextmanager
@@ -183,20 +185,76 @@ def create_app() -> FastAPI:
     @app.get("/api/files/{file_id}/download", tags=["Collected PDFs"])
     async def download_file_binary(file_id: str):
         """Download or stream the original binary PDF document."""
+        import httpx
         meta = service.get_pdf_metadata(file_id)
-        if not meta or not meta.local_path:
+        if not meta:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"File '{file_id}' not found.")
 
-        path = Path(meta.local_path)
-        if not path.is_file():
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"File on disk missing.")
+        # 1. If cached on local disk, serve directly
+        if meta.local_path and Path(meta.local_path).is_file():
+            path = Path(meta.local_path)
+            return FileResponse(
+                path=path,
+                media_type="application/pdf",
+                filename=path.name,
+                content_disposition_type="attachment",
+            )
 
-        return FileResponse(
-            path=path,
-            media_type="application/pdf",
-            filename=path.name,
-            content_disposition_type="attachment",
-        )
+        # 2. Otherwise stream on-the-fly from OurDIU with 0 permanent disk space
+        if meta.pdf_url:
+            async def stream_remote():
+                async with httpx.AsyncClient(
+                    headers={"User-Agent": "Mozilla/5.0"},
+                    timeout=httpx.Timeout(30.0),
+                    follow_redirects=True,
+                ) as client:
+                    async with client.stream("GET", meta.pdf_url) as resp:
+                        if resp.status_code != 200:
+                            raise HTTPException(status_code=resp.status_code, detail="Remote PDF source unavailable.")
+                        async for chunk in resp.aiter_bytes():
+                            yield chunk
+
+            filename = f"{meta.file_id}.pdf"
+            return StreamingResponse(
+                stream_remote(),
+                media_type="application/pdf",
+                headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+            )
+
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="PDF binary source unavailable.")
+
+    @app.get("/api/files/{file_id}/pages/{page_number}", tags=["Collected PDFs"])
+    async def get_question_page_image(
+        file_id: str,
+        page_number: int = 1,
+        scale: float = Query(2.0, ge=0.5, le=4.0, description="Image rendering scale / DPI multiplier"),
+    ):
+        """Render a specific page of an exam question PDF as a PNG image on-the-fly.
+        
+        Allows multi-modal LLMs (ChatGPT Vision, Claude) and web browsers to visually
+        inspect diagrams, circuits, graphs, tables, and handwritten questions with zero
+        permanent storage consumption.
+        """
+        try:
+            png_bytes, p_num, total_pages = await preview_service.get_page_png_bytes(
+                file_id=file_id,
+                page_number=page_number,
+                scale=scale,
+            )
+            return Response(
+                content=png_bytes,
+                media_type="image/png",
+                headers={
+                    "X-Total-Pages": str(total_pages),
+                    "X-Current-Page": str(p_num),
+                    "Cache-Control": "public, max-age=3600",
+                },
+            )
+        except ValueError as err:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(err))
+        except Exception as err:
+            logger.error(f"Error serving page preview image for {file_id}: {err}")
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Rendering failed.")
 
     @app.get("/api/collections/{collection_id}", tags=["Collected PDFs"])
     async def get_collection_summary(collection_id: str):
