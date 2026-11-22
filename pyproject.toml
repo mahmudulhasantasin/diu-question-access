@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "diu-question-mcp"
+version = "1.0.0"
+description = "Model Context Protocol (MCP) Server for DIU Previous Examination Questions"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [
+    { name = "DIU Question MCP Developer", email = "developer@ourdiu.com" }
+]
+dependencies = [
+    "mcp>=2.3.0",
+    "httpx>=0.28.0",
+    "beautifulsoup4>=4.13.0",
+    "pydantic>=2.10.0",
+    "python-dotenv>=1.0.1",
+    "uvicorn>=0.30.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[project.scripts]
+diu-question-mcp = "server:main"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
