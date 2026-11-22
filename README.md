@@ -1,138 +1,180 @@
-# DIU Previous Question MCP Server
+# DIU Question Access — Production MCP & REST Server
 
-An interactive, production-ready [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) Server in Python that dynamically discovers, crawls, archives, and delivers original Daffodil International University (DIU) examination question PDFs from [OurDIU Question Bank](https://ourdiu.com/questions/browse) to AI agents (such as Claude, ChatGPT, Cursor, and custom MCP clients).
+[![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue.svg)](https://www.python.org/)
+[![MCP Specification](https://img.shields.io/badge/MCP-Protocol%20v2.3-purple.svg)](https://modelcontextprotocol.io/)
+[![Framework](https://img.shields.io/badge/FastAPI-0.139-009688.svg)](https://fastapi.tiangolo.com/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![Build & Tests](https://img.shields.io/badge/Tests-31%20Passed-success.svg)]()
 
----
+An enterprise-grade, universal **Model Context Protocol (MCP)** and **REST API** server that dynamically discovers, crawls, archives, and delivers original Daffodil International University (DIU) examination question papers from the [OurDIU Question Bank](https://ourdiu.com/questions/browse).
 
-## 🚀 Key Highlights & Philosophy
-
-* **100% Original PDF Preservation**: Strict binary download via HTTP. No OCR, no text extraction, no page rasterization, no compression, and no format conversion. All math equations, figures, tables, and exam layouts are preserved pixel-for-pixel.
-* **Direct AI Document Delivery**: Exposes individual PDF documents using the official MCP binary resource mechanism (`types.BlobResourceContents` with MIME `application/pdf`) and MCP tools, avoiding bloated ZIP archives or lossy text transforms.
-* **Dynamic Discovery (Zero Hardcoding)**: Automatically extracts departments, courses, course-specific semesters, and exam types from live OurDIU server state (React Router / Remix turbo-stream payload and HTML fallback).
-* **Conversational AI Workflows**: Optimized tool schemas and descriptions designed for step-by-step interactive agent conversations:
-  1. Department selection
-  2. Course selection
-  3. Semester selection (defaults to **all available semesters**, or supports single/multiple selections)
-  4. Exam type selection (Midterm, Final, Quiz, or All)
-* **Comprehensive Caching & Verification**: SQLite-backed metadata tracking, SHA-256 checksum computation, `%PDF-` binary magic header validation, and deduplication.
+Built for seamless integration with **Claude Desktop, ChatGPT (Custom GPT Actions), Cursor IDE, VS Code, and any Cloud platform (Koyeb, Render, Docker, VPS)**.
 
 ---
 
-## 🏗️ Architecture
+## 📑 Table of Contents
+
+- [Key Architectural Highlights](#-key-architectural-highlights)
+- [System Architecture](#-system-architecture)
+- [Project Directory Layout](#-project-directory-layout)
+- [Requirements](#-requirements)
+- [Local Installation & Setup](#-local-installation--setup)
+- [Running Automated Tests](#-running-automated-tests)
+- [Execution Modes](#-execution-modes)
+- [Client Integration Guides](#-client-integration-guides)
+  - [1. Claude Desktop Setup](#1-claude-desktop-setup)
+  - [2. ChatGPT Setup (Web, Desktop & Mobile)](#2-chatgpt-setup-web-desktop--mobile)
+  - [3. Cursor IDE Setup](#3-cursor-ide-setup)
+  - [4. MCP Inspector (Visual Testing)](#4-mcp-inspector-visual-testing)
+- [Interactive Conversational Workflow](#-interactive-conversational-workflow)
+- [MCP Tools Reference (9 Tools)](#-mcp-tools-reference-9-tools)
+- [REST API Endpoints Reference](#-rest-api-endpoints-reference)
+- [Cloud Deployment (Koyeb, Render, Docker)](#-cloud-deployment-koyeb-render-docker)
+- [Storage Layout & Deduplication](#-storage-layout--deduplication)
+- [Troubleshooting & FAQs](#-troubleshooting--faqs)
+- [License](#-license)
+
+---
+
+## 🌟 Key Architectural Highlights
+
+* **100% Original PDF Preservation**: Strict binary download via HTTP. No lossy OCR, no text extraction pipelines, no rasterization to images, and no compression. All mathematical formulas, circuit schematics, UML diagrams, algorithms, and formatting remain 100% intact.
+* **Universal Multi-Platform Delivery**:
+  * **Local stdio Transport**: For Claude Desktop, Cursor IDE, Windsurf, and VS Code.
+  * **OpenAPI 3.1 & REST API**: For ChatGPT Custom GPT Actions, Mobile apps, and Web applications.
+  * **Streamable SSE Transport**: For remote MCP hosts (Claude.ai Web Connectors, LibreChat, Dify).
+* **Dynamic Discovery (Zero Hardcoding)**: Automatically extracts departments, courses (with aliases like `os`, `ds`, `algo`), semesters, and exam types from live OurDIU server state (React Router / Remix turbo-stream payload and HTML fallback).
+* **Safe Large-File Delivery**: Provides official question text transcriptions directly in tool responses to prevent client IPC buffer crashes on large PDFs, while serving direct download links and local paths.
+* **High-Performance Caching & SQLite Repository**: Indexed SQLite storage tracking SHA-256 hashes, file sizes, and metadata to prevent redundant downloads.
+
+---
+
+## 🏗️ System Architecture
 
 ```
-                                  +---------------------------------------+
-                                  |         MCP Client (AI Agent)         |
-                                  |   (Claude Desktop, Cursor, ChatGPT)   |
-                                  +-------------------+-------------------+
-                                                      |
-                                           JSON-RPC (stdio / SSE)
-                                                      |
-                                  +-------------------v-------------------+
-                                  |         DIU Question MCP Server       |
-                                  |               (server.py)             |
-                                  +---------+-------------------+---------+
-                                            |                   |
-                     +----------------------v-------+   +-------v----------------------+
-                     |         MCP Tools &          |   |          SQLite Store        |
-                     |      Resource Delivery       |   |  (departments, courses,      |
-                     |  (diu-question://pdf/{id})   |   |   collections, sha256 cache) |
-                     +--------------+---------------+   +------------------------------+
-                                    |
-                     +--------------v---------------+
-                     |     Collection Coordinator   |
-                     | (services/collection_service)|
-                     +-------+--------------+-------+
-                             |              |
-           +-----------------v----+    +----v--------------------+
-           |  Scraper & Crawler   |    |    Downloader Engine    |
-           | - Departments/Courses|    | - HTTP Binary Download  |
-           | - Semesters & Types  |    | - %PDF- Magic Header Val|
-           | - Multi-page Crawl   |    | - SHA-256 Verification  |
-           | - Submissions & URLs |    | - Local Storage Layout  |
-           +-----------------+----+    +----+--------------------+
-                             |              |
-                             +-------+------+
-                                     |
-                                     v
-                   +----------------------------------+
-                   |       OurDIU Data Sources        |
-                   | - ourdiu.com (React Router SSR)  |
-                   | - files.ourdiu.com (PDF storage) |
-                   +----------------------------------+
+                             +-------------------------------------------------------------+
+                             |                         AI Clients                          |
+                             |   Claude Desktop | ChatGPT (GPT-4o) | Cursor IDE | Web App  |
+                             +--------------+------------------------------+---------------+
+                                            |                              |
+                             JSON-RPC (stdio)                      HTTP / REST / SSE
+                                            |                              |
+                             +--------------v------------------------------v---------------+
+                             |              DIU Question Universal Server                  |
+                             |                (server.py / api.py)                         |
+                             +-----------------------------+-------------------------------+
+                                                           |
+                      +------------------------------------+-----------------------------------+
+                      |                                                                        |
+     +----------------v----------------+                                      +----------------v----------------+
+     |        MCP Tools Engine         |                                      |        FastAPI REST API         |
+     | - list_departments              |                                      | - GET  /health                  |
+     | - list_courses                  |                                      | - GET  /openapi.json            |
+     | - list_semesters                |                                      | - GET  /docs (Swagger UI)       |
+     | - list_exam_types               |                                      | - POST /api/search              |
+     | - search_questions              |                                      | - POST /api/collect             |
+     | - collect_questions             |                                      | - GET  /api/files/{id}/download |
+     | - get_pdf_file                  |                                      +----------------+----------------+
+     +----------------+----------------+                                                       |
+                      |                                                                        |
+                      +------------------------------------+-----------------------------------+
+                                                           |
+                                            +--------------v---------------+
+                                            |     Collection Coordinator   |
+                                            | (services/collection_service)|
+                                            +-------+--------------+-------+
+                                                    |              |
+                                  +-----------------v----+    +----v--------------------+
+                                  |   Crawler Engine     |    |    Downloader Engine    |
+                                  | - Turbo-stream Parser|    | - HTTP Binary Download  |
+                                  | - Multi-page Crawl   |    | - %PDF- Magic Header Val|
+                                  | - Submissions & URLs |    | - SHA-256 Verification  |
+                                  | - Aliases & Semesters|    | - SQLite Deduplication  |
+                                  +-----------------+----+    +----+--------------------+
+                                                    |              |
+                                                    +-------+------+
+                                                            |
+                                                            v
+                                          +----------------------------------+
+                                          |       OurDIU Data Sources        |
+                                          | - ourdiu.com (React Router SSR)  |
+                                          | - files.ourdiu.com (Original PDF)|
+                                          +----------------------------------+
 ```
 
 ---
 
-## 📁 Project Structure
+## 📁 Project Directory Layout
 
 ```
 diu-question/
-├── server.py                 # Main MCP server entrypoint (stdio & sse transports)
-├── config.py                 # Central configuration and environment settings
+├── api.py                    # Production FastAPI REST API & OpenAPI 3.1 server
+├── server.py                 # Multi-transport server entrypoint (stdio, http, sse)
+├── config.py                 # Global configurations & environment variable loader
 ├── requirements.txt          # Python dependencies
-├── pyproject.toml            # Project packaging specification
-├── .env.example              # Example environment variable template
+├── pyproject.toml            # Build metadata & pytest configuration
+├── Dockerfile                # Production multi-stage Docker container specification
+├── docker-compose.yml        # Docker compose configuration with persistent volume
+├── test_live_integration.py  # End-to-end integration test against live OurDIU site
+├── README.md                 # Complete system documentation
+├── .env.example              # Environment variables template
 ├── .gitignore                # Git exclusions
-├── README.md                 # Full documentation
-├── test_live_integration.py  # Live end-to-end integration test against OurDIU
 │
-├── scraper/                  # Dynamic discovery & web crawling
-│   ├── __init__.py
-│   ├── client.py             # Async HTTP client & React Router stream parser
+├── scraper/                  # Web scraping & dynamic discovery
+│   ├── client.py             # Async HTTP client with retry logic & turbo-stream decoder
 │   ├── departments.py        # Department discovery
 │   ├── courses.py            # Course discovery & alias matching
 │   ├── semesters.py          # Semester discovery & normalization logic
 │   ├── exams.py              # Exam type normalization & filtering
 │   ├── pagination.py         # Multi-page pagination traversal
-│   └── pdf_extractor.py      # Exam detail page & submission PDF URL extraction
+│   └── pdf_extractor.py      # Detail page parser & multi-submission extraction
 │
-├── downloader/               # Original binary PDF downloading & storage
-│   ├── __init__.py
-│   ├── pdf_downloader.py     # Resilient async HTTP PDF downloader
-│   ├── validator.py          # %PDF- header, size, & SHA-256 validation
-│   └── storage.py            # Local directory layout & filename sanitization
+├── downloader/               # PDF download, validation & storage
+│   ├── pdf_downloader.py     # Resilient async HTTP binary downloader
+│   ├── validator.py          # %PDF- header, size, and SHA-256 checksum validator
+│   └── storage.py            # Sanitized local directory management
 │
 ├── database/                 # SQLite metadata persistence & cache
-│   ├── __init__.py
 │   ├── models.py             # Dataclasses & Pydantic models
 │   └── repository.py         # SQLite database operations & indexing
 │
 ├── services/                 # Business logic and coordination
-│   ├── __init__.py
-│   ├── collection_service.py # End-to-end collection workflow coordinator
+│   ├── collection_service.py # Core collection workflow coordinator
 │   ├── cache_service.py      # Cache lookup & disk verification
-│   └── metadata_service.py   # Summary statistics & byte formatting
+│   └── metadata_service.py   # Statistical summaries & formatting
 │
-├── tests/                    # Comprehensive automated test suite
-│   ├── test_scraper.py       # Scraper & stream decoder unit tests
+├── tests/                    # Automated test suite (31 unit tests)
+│   ├── test_api.py           # FastAPI REST & OpenAPI endpoint tests
+│   ├── test_scraper.py       # Scraper & stream decoder tests
 │   ├── test_downloader.py    # PDF validator & storage tests
 │   ├── test_filters.py       # Semester & exam type normalization tests
 │   └── test_mcp.py           # MCP tool invocation & resource delivery tests
 │
-└── data/                     # Local question PDF repository (organized by course)
-    ├── .gitkeep
-    └── diu_questions.db      # SQLite database
+└── data/                     # Local question PDF repository
+    ├── diu_questions.db      # SQLite database
+    └── CSE/Operating_Systems/...
 ```
 
 ---
 
-## 📦 System Requirements
+## 💻 Requirements
 
-* **Python 3.11+** (Tested and fully compatible with Python 3.11, 3.12, 3.13, and 3.14).
-* **Operating System**: Windows 10/11, macOS, or Linux.
+* **Python**: `3.11` or higher (fully tested on Python 3.11, 3.12, 3.13, and 3.14).
+* **Operating Systems**: Windows 10/11, macOS, or Linux.
 * **Network Access**: Outbound HTTPS to `ourdiu.com` and `files.ourdiu.com`.
 
 ---
 
-## ⚙️ Installation & Setup
+## 🚀 Local Installation & Setup
 
-### 1. Clone or Open the Repository
+### 1. Clone the Repository
 ```bash
-cd c:\Users\tasin\Downloads\diu-question
+git clone https://github.com/mahmudulhasantasin/diu-question-access.git
+cd diu-question-access
 ```
 
-### 2. Set Up a Python Virtual Environment
+### 2. Set Up a Virtual Environment
 
 #### On Windows (PowerShell):
 ```powershell
@@ -151,182 +193,135 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-*(Optional development tools)*:
-```bash
-pip install pytest pytest-asyncio
-```
-
-### 4. Configure Environment
-Copy the example environment configuration:
+### 4. Create Local Environment Configuration
 ```powershell
 Copy-Item .env.example .env
 ```
 
 ---
 
-## 🧪 Running the Tests
+## 🧪 Running Automated Tests
 
-Execute the automated test suite (25 unit tests covering scrapers, filters, pagination, downloader, and MCP tools):
-```powershell
+Run the complete automated test suite (31 unit tests covering all components):
+```bash
 python -m pytest -v
 ```
 
-Run the live integration test (crawls and downloads actual question papers from OurDIU to verify live website compatibility):
-```powershell
+Run the live integration test (crawls and downloads actual question papers from OurDIU to verify live website connectivity):
+```bash
 python test_live_integration.py
 ```
 
 ---
 
-## 🌐 Universal Multi-Platform Deployment (Claude, ChatGPT, Docker & Cloud)
+## ⚡ Execution Modes
 
-This server is built with a **Universal Hybrid Architecture**:
-1. **Local MCP Mode (`stdio`)**: For Claude Desktop, Cursor IDE, VS Code.
-2. **Production REST API & OpenAPI 3.1 Mode (`http`)**: For **ChatGPT (Custom GPT Actions)**, Web Apps, Mobile Apps, and Cloud Deployments.
-3. **Remote MCP Mode (`sse`)**: For remote Claude / LibreChat / Dify integrations.
-
----
-
-### 🐳 1. Docker Deployment (Production-Ready)
-
-Run the server anywhere with a single Docker command:
-
-```bash
-docker compose up -d
-```
-
-Or build manually:
-```bash
-docker build -t diu-question-server .
-docker run -d -p 8000:8000 -v diu_data:/app/data --name diu-server diu-question-server
-```
-
-* **Swagger UI Documentation**: `http://localhost:8000/docs`
-* **OpenAPI 3.1 Schema**: `http://localhost:8000/openapi.json`
-* **Health Check**: `http://localhost:8000/health`
-* **MCP SSE Endpoint**: `http://localhost:8000/mcp`
-
----
-
-### 🤖 2. Connecting to ChatGPT (Web, Desktop, & Mobile)
-
-ChatGPT uses standard **OpenAPI 3.0/3.1 Actions** to interact with external tools:
-
-1. Start the server in HTTP mode:
-   ```bash
-   python server.py --transport http --port 8000
-   ```
-2. If running locally, expose it via a tunnel:
-   ```bash
-   npx localtunnel --port 8000
-   # Or using Cloudflare / ngrok:
-   # ngrok http 8000
-   ```
-3. Open [chatgpt.com](https://chatgpt.com) $\to$ **Explore GPTs** $\to$ **Create a GPT**.
-4. In the **Configure** tab:
-   * **Name**: DIU Question Solver
-   * Scroll down to **Actions** $\to$ Click **Create new action**.
-   * Under **Schema**, paste the content from your server's `/openapi.json` (or import from your public URL: `https://your-domain.com/openapi.json`).
-5. Save the GPT!
-   * Now, **ChatGPT on web, desktop, and mobile (iOS & Android)** can search, download, and analyze DIU previous exam questions directly!
-
----
-
-### ☁️ 3. Deploying to Cloud Platforms
-
-#### Option A: Render (Free / Web Service)
-1. Fork or push this repository to GitHub.
-2. In [Render Dashboard](https://dashboard.render.com), click **New Web Service** $\to$ Connect your repo.
-3. Select **Docker** environment (or Python environment with start command: `uvicorn api:app --host 0.0.0.0 --port $PORT`).
-4. Add a Persistent Disk mounted at `/app/data` to cache downloaded PDFs.
-
-#### Option B: Railway / Fly.io
-```bash
-# Fly.io
-fly launch
-fly deploy
-
-# Railway
-railway up
-```
-
----
-
-## 🚀 Running the MCP Server
-
-### Mode 1: Standard Stdio Transport (Recommended for Claude Desktop & Cursor)
+### Mode 1: Local MCP stdio (For Claude Desktop & Cursor)
 ```bash
 python server.py --transport stdio
 ```
 
-### Mode 2: SSE / HTTP Transport (For remote AI clients or network access)
+### Mode 2: Production REST API & Swagger UI (For ChatGPT & Cloud)
 ```bash
-python server.py --transport sse --host 127.0.0.1 --port 8000
+python server.py --transport http --host 0.0.0.0 --port 8000
 ```
-* The SSE endpoint will be available at: `http://127.0.0.1:8000/sse`
+* **Swagger UI Documentation**: `http://localhost:8000/docs`
+* **OpenAPI 3.1 Specification**: `http://localhost:8000/openapi.json`
+* **Health Check**: `http://localhost:8000/health`
+* **MCP SSE Endpoint**: `http://localhost:8000/mcp`
+
+### Mode 3: Docker Container
+```bash
+docker compose up -d
+```
 
 ---
 
-## 🔌 Connecting to MCP Clients
+## 🔌 Client Integration Guides
 
-### Connecting to Claude Desktop
+### 1. Claude Desktop Setup
 
-Edit your Claude Desktop configuration file:
-* **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-* **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+1. Open your Claude Desktop configuration file:
+   * **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`  
+     *(Or if your Claude profile uses `AppData\Local\Claude-Data\<profile>\claude_desktop_config.json`)*
+   * **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
 
-Add the `diu-question-mcp` server:
-
+2. Add the `diu-question` configuration:
 ```json
 {
   "mcpServers": {
     "diu-question": {
-      "command": "python",
+      "command": "C:\\Users\\tasin\\AppData\\Local\\Programs\\Python\\Python314\\python.exe",
       "args": [
         "c:\\Users\\tasin\\Downloads\\diu-question\\server.py",
         "--transport",
         "stdio"
       ],
-      "env": {
-        "DIU_DATA_DIR": "c:\\Users\\tasin\\Downloads\\diu-question\\data",
-        "DIU_DB_PATH": "c:\\Users\\tasin\\Downloads\\diu-question\\data\\diu_questions.db"
-      }
+      "cwd": "c:\\Users\\tasin\\Downloads\\diu-question"
     }
   }
 }
 ```
 
-> **Windows Tip**: Use double backslashes (`\\`) in JSON file paths, or point to your virtual environment's Python executable (e.g., `C:\\Users\\tasin\\Downloads\\diu-question\\.venv\\Scripts\\python.exe`).
+3. Completely quit Claude Desktop (Right-click in System Tray $\to$ **Quit**) and relaunch.
+4. Go to **Settings $\to$ Developer / Plugins**; `diu-question` will show as **Active**.
 
-### Connecting to Cursor IDE
+---
 
-1. Open **Cursor Settings** -> **Features** -> **MCP**.
-2. Click **+ Add New MCP Server**.
-3. Fill in the fields:
+### 2. ChatGPT Setup (Web, Desktop & Mobile)
+
+ChatGPT interacts with external servers using **OpenAPI Actions**:
+
+1. Start your server in HTTP mode:
+   ```bash
+   python server.py --transport http --port 8000
+   ```
+2. If running locally, expose your server with a public HTTPS URL:
+   ```bash
+   npx localtunnel --port 8000
+   # Or: ngrok http 8000
+   ```
+   *(If hosted on Koyeb or Render, use your permanent URL, e.g. `https://your-app.koyeb.app`)*.
+
+3. Open [chatgpt.com](https://chatgpt.com) $\to$ **Explore GPTs** $\to$ **Create a GPT**.
+4. In the **Configure** tab:
+   * Name: `DIU Question Helper`
+   * Under **Actions**, click **Create new action**.
+   * Under **Schema**, paste the contents of your `/openapi.json` URL (or click **Import from URL** and enter `https://your-app.koyeb.app/openapi.json`).
+5. Save the GPT.
+6. Now, on **any device (Web, Desktop, iOS, Android)**, ask ChatGPT:
+   > *"Show me previous exam questions for Operating Systems at DIU CSE."*  
+   ChatGPT will call your server, fetch the questions, and provide full summaries!
+
+---
+
+### 3. Cursor IDE Setup
+
+1. Open **Cursor Settings** $\to$ **Features** $\to$ **MCP**.
+2. Click **+ Add New MCP Server**:
    * **Name**: `diu-question`
    * **Type**: `command`
    * **Command**: `python c:\Users\tasin\Downloads\diu-question\server.py --transport stdio`
 
 ---
 
-## 💬 Interactive User Experience
+### 4. MCP Inspector (Visual Testing)
 
-The MCP tools are annotated to encourage conversational agent workflows:
+To test every tool and inspect responses directly inside a web browser UI without any AI client:
+```bash
+npx @modelcontextprotocol/inspector python server.py
+```
+Open the generated localhost URL to test `list_departments`, `list_courses`, `collect_questions`, etc.
 
-````markdown
-User: "Can you help me find previous exam questions from DIU?"
+---
 
-Agent: "I can help with that! Which department are you looking for? (e.g. CSE, EEE, BBA, Civil, English, etc.)"
-[Agent calls `list_departments()` to check available departments]
+## 💬 Interactive Conversational Workflow
 
-User: "CSE"
+```markdown
+User: "Find previous questions for Operating Systems from DIU CSE."
 
-Agent: "Which course in Computer Science and Engineering do you need questions for?"
-[Agent calls `list_courses(department="CSE")`]
-
-User: "Operating Systems" (or "CSE 221")
-
-Agent: "For Operating Systems, previous questions are available across multiple semesters:
+Agent: [Calls `list_semesters(department="CSE", course="Operating Systems")`]
+Agent: "For Operating Systems, questions are available for:
 - Fall 26
 - Spring 26
 - Fall 25
@@ -335,69 +330,104 @@ Agent: "For Operating Systems, previous questions are available across multiple 
 - Spring 24
 - Fall 23
 
-Which semester(s) would you like? (By default, I can collect All semesters, or specific ones like 'Fall 2024')."
+Which semesters would you like? (By default, I can collect 'All', or specific ones like 'Fall 2024')."
 
-User: "Fall 2024 and Fall 26"
+User: "Fall 26 Midterm and Quiz"
 
-Agent: "Got it. Which exam types do you need?
-1. Midterm
-2. Final
-3. Quiz
-4. All exam types"
+Agent: [Calls `collect_questions(department="CSE", course="Operating Systems", semesters="Fall 26", exam_types=["midterm", "quiz"])`]
 
-User: "Midterm and Final"
+Agent: "I have collected 10 question papers for Fall 26 (5 Midterm, 5 Quiz).
+Total download size: 3.37 MB.
+Would you like me to inspect and analyze the questions?"
 
-Agent: [Agent calls `collect_questions(department="CSE", course="Operating Systems", semesters=["Fall 2024", "Fall 2026"], exam_types=["midterm", "final"])`]
+User: "Analyze the Midterm questions and tell me the main topics."
 
-Agent: "I have collected 7 question papers for Operating Systems across Fall 26 and Fall 24 (total size: 1.84 MB).
-Here is the summary of downloaded papers:
-- Fall 26 Midterm (Section B, Section M)
-- Fall 24 Final
-- Fall 24 Midterm
+Agent: [Calls `get_pdf_file(file_id="pdf_1996_2999")`]
+Agent: "Here is the breakdown of the Fall 26 Midterm Exam for Operating Systems:
+1. Process Management: Process lifecycle, fork() behavior, child-parent synchronization.
+2. CPU Scheduling: Gantt chart calculations for Round Robin and SJF.
+3. Concurrency & Deadlocks: Four conditions of deadlock, Banker's algorithm.
 
-Would you like me to inspect any of these exam papers?"
-````
+Download original PDF: https://files.ourdiu.com/watermarked/dd975da1-3a98-482d-af7f-3f6d3bfe2b1b.pdf
+Saved locally at: data/CSE/Operating_Systems/Fall_26/midterm/question_1996_sub_2999_sec_L.pdf"
+```
 
 ---
 
-## 🛠️ MCP Tools Reference
+## 🛠️ MCP Tools Reference (9 Tools)
 
-| Tool | Parameters | Description |
+| Tool Name | Parameters | Description |
 | :--- | :--- | :--- |
 | `list_departments` | `force_refresh: bool = False` | Returns all academic departments discovered from OurDIU. |
 | `list_courses` | `department: str, force_refresh: bool = False` | Returns all courses under the given department (supports short name, full name, or ID). |
-| `list_semesters` | `department: str, course: str` | Returns semesters specifically containing examination papers for the selected course. |
+| `list_semesters` | `department: str, course: str` | Returns semesters specifically containing question papers for the selected course. |
 | `list_exam_types` | `department: str, course: str` | Returns available exam categories for the course (Midterm, Final, Quiz). |
-| `search_questions` | `department, course, semesters="all", exam_types="all"` | Crawls exam entries and extracts PDF candidates **without downloading**, useful for previewing. |
+| `search_questions` | `department, course, semesters="all", exam_types="all"` | Crawls exam entries and extracts PDF candidates **without downloading** (preview mode). |
 | `collect_questions` | `department, course, semesters="all", exam_types="all", force_refresh=False` | Downloads original PDFs, validates binary integrity, stores to disk, records metadata, and returns a summary. |
 | `list_collected_files`| `bundle_id: Optional[str] = None` | Lists metadata and unique `file_id`s for collected PDF documents. |
-| `get_pdf_file` | `file_id: str` | Returns one individual original PDF through an embedded MCP `BlobResourceContents` (MIME `application/pdf`) and local disk path. |
+| `get_pdf_file` | `file_id: str` | Returns question paper transcription, direct download link, local disk path, and binary resource reference. |
 | `get_question_collection_summary` | `collection_id: str` | Returns detailed statistics (total files, size, distributions) for a previous collection session. |
 
 ---
 
-## 📄 MCP Resource URIs
+## 🌐 REST API Endpoints Reference
 
-* **`diu-question://pdf/{file_id}`**: Delivers the unmodified binary PDF data (`application/pdf`) encoded in base64.
-* **`diu-question://collection/{collection_id}`**: Delivers collection session metadata as formatted JSON.
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/health` | Container & orchestrator health check. |
+| `GET` | `/docs` | Interactive Swagger UI documentation. |
+| `GET` | `/openapi.json` | OpenAPI 3.1 specification for ChatGPT Actions. |
+| `GET` | `/api/departments` | Discovered departments list. |
+| `GET` | `/api/courses?department=CSE` | Department course list. |
+| `GET` | `/api/semesters?department=CSE&course=Operating+Systems` | Course-specific semesters list. |
+| `GET` | `/api/exam-types?department=CSE&course=Operating+Systems`| Available exam types list. |
+| `POST`| `/api/search` | Search exam entries without downloading. |
+| `POST`| `/api/collect` | Download matching PDFs and record metadata. |
+| `GET` | `/api/files?bundle_id={id}` | List collected files. |
+| `GET` | `/api/files/{file_id}` | Retrieve file metadata & question transcription. |
+| `GET` | `/api/files/{file_id}/download` | Direct binary PDF streaming & browser download. |
+| `GET` | `/api/collections/{collection_id}` | Collection bundle summary statistics. |
 
 ---
 
-## 📑 Local PDF Storage Layout
+## ☁️ Cloud Deployment (Koyeb, Render, Docker)
 
-Original PDF files are organized predictably on disk:
+### Deploying to Koyeb (Free, Always-On, No Sleep)
+1. Sign up for free at [koyeb.com](https://www.koyeb.com/) using GitHub.
+2. Click **Create App** $\to$ Select **GitHub**.
+3. Select your repository `mahmudulhasantasin/diu-question-access`.
+4. Koyeb automatically detects `Dockerfile`.
+   * **Instance**: `Free (Nano)`
+   * **Port**: `8000`
+5. Click **Deploy**. Your permanent HTTPS URL will be ready in under 2 minutes!
+
+### Deploying to Render
+1. Go to [render.com](https://render.com/) $\to$ **New Web Service**.
+2. Connect your repository.
+3. Configure:
+   * **Environment**: `Python 3`
+   * **Build Command**: `pip install -r requirements.txt`
+   * **Start Command**: `uvicorn api:app --host 0.0.0.0 --port $PORT`
+4. Deploy!
+
+---
+
+## 🗄️ Storage Layout & Deduplication
+
+Downloaded PDFs are saved locally in a structured hierarchy:
 
 ```
 data/
+├── diu_questions.db          # SQLite metadata, checksums, and collection records
 └── CSE/
     └── Operating_Systems/
         ├── Fall_26/
+        │   ├── midterm/
+        │   │   ├── question_1996_sub_2998_sec_B.pdf
+        │   │   └── question_1996_sub_2999_sec_L.pdf
         │   └── quiz/
         │       ├── question_1949_sub_2967_sec_m.pdf
-        │       ├── question_1949_sub_3208_sec_B.pdf
-        │       ├── question_1949_sub_3210_sec_66-J.pdf
-        │       ├── question_1949_sub_3211_sec_66-B.pdf
-        │       └── question_1949_sub_3212_sec_J.pdf
+        │       └── question_1949_sub_3211_sec_66-B.pdf
         └── Fall_24/
             ├── final/
             │   └── question_1230_sub_1800.pdf
@@ -407,29 +437,19 @@ data/
 
 ---
 
-## 🔍 Understanding LLM PDF Delivery & Limitations
+## ❓ Troubleshooting & FAQs
 
-### 1. Exposing vs. Retrieving vs. Attaching
-* **Exposing a PDF through MCP**: The MCP server registers resources with URI `diu-question://pdf/{file_id}` and tools returning `types.BlobResourceContents(blob=..., mime_type="application/pdf")`.
-* **Client Retrieval**: When an AI client invokes `get_pdf_file(file_id)`, the MCP host receives the response containing both the local absolute file path and the base64 binary blob.
-* **Client Attachment to LLM Context**:
-  * **Native PDF Understanding (e.g., Claude 3.5 Sonnet / Gemini 1.5 Pro)**: If the client host application supports binary attachments, it forwards the PDF bytes directly to the model's multimodal document understanding pipeline.
-  * **Clients without direct binary MCP ingestion**: For clients that do not automatically inject binary MCP tool returns into LLM context, `get_pdf_file` returns the canonical `local_path` on disk. The client or user can directly access or attach the file from disk.
+#### Q: Claude says "get_pdf_file error" or "cannot open path from my workspace"?
+**A**: This occurs when an AI client running in the cloud tries to access a local Windows drive path (`C:\...`) or when large base64 buffers exceed client limits. We solved this by delivering the official question transcription directly inside `question_text` and providing direct download links (`pdf_download_url`).
 
-### 2. Why No OCR or Text Extraction?
-University examination questions in computer science, engineering, and mathematics frequently include circuit diagrams, graphs, UML diagrams, tree structures, mathematical equations, and formatted code snippets. Rasterizing or running basic OCR on these files degrades fidelity. By preserving the original vector PDF bytes, modern multimodal LLMs can inspect the original document directly without loss of structure.
+#### Q: Does this server perform OCR or modify the PDFs?
+**A**: No. Per project specifications, the original PDF bytes are downloaded directly via HTTP and verified using magic bytes `%PDF-` and SHA-256 checksums. No OCR, text chunking, embedding, or conversion is performed.
 
----
-
-## 🛡️ Error Handling & Resilience
-
-* **Rate Limiting & Politeness**: Scraper introduces polite inter-request delays and respects HTTP 429 `Retry-After` headers.
-* **Exponential Backoff**: Up to 3 retries on transient network disconnects or 5xx gateway drops.
-* **Binary Magic Header Verification**: Validates `b'%PDF-'` on all downloads to avoid saving HTML error pages as `.pdf`.
-* **Deduplication**: Files with matching SHA-256 hashes are not redownloaded unless `force_refresh=True` is provided.
+#### Q: How do I force redownload of already cached papers?
+**A**: Pass `force_refresh=True` to the `collect_questions` tool or `/api/collect` REST endpoint.
 
 ---
 
-## 📜 License
+## 📄 License
 
-MIT License. Designed for academic and educational question paper retrieval.
+This project is licensed under the [MIT License](LICENSE). Developed for academic reference and student research.
