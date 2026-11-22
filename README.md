@@ -1,3 +1,14 @@
+---
+title: DIU Question Access
+emoji: 🎓
+colorFrom: blue
+colorTo: indigo
+sdk: gradio
+sdk_version: 6.32.0
+app_file: app.py
+pinned: false
+---
+
 # DIU Question Access — Production MCP & REST Server
 
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue.svg)](https://www.python.org/)
