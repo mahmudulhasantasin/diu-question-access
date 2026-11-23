@@ -61,6 +61,12 @@ class MCPProxyMiddleware:
 
     async def __call__(self, scope, receive, send):
         if scope["type"] == "http" and scope.get("path", "").startswith("/mcp"):
+            # Handle HEAD probes cleanly without opening an SSE stream
+            if scope.get("method") == "HEAD":
+                response = Response(status_code=200, media_type="text/event-stream")
+                await response(scope, receive, send)
+                return
+
             if scope["path"] == "/mcp":
                 scope["path"] = "/mcp/"
             headers = scope.get("headers", [])
