@@ -7,6 +7,7 @@ sdk: gradio
 sdk_version: 6.32.0
 app_file: app.py
 pinned: false
+suggested_hardware: cpu-basic
 ---
 
 # DIU Question Access — Production MCP & REST Server
