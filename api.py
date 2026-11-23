@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 import logging
 from pathlib import Path
 from typing import List, Union, Optional, Dict, Any
-from fastapi import FastAPI, HTTPException, Query, Response, status
+from fastapi import FastAPI, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
@@ -83,6 +83,13 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def mcp_slash_middleware(request: Request, call_next):
+        """Ensure /mcp without trailing slash routes directly to the mounted SSE app."""
+        if request.url.path == "/mcp":
+            request.scope["path"] = "/mcp/"
+        return await call_next(request)
 
     # -------------------------------------------------------------
     # Root & Health Check (Render, Cloud Run, Kubernetes, Docker)
