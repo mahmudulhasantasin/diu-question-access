@@ -67,8 +67,10 @@ class MCPProxyMiddleware:
                 await response(scope, receive, send)
                 return
 
-            if scope["path"] == "/mcp":
+            # For GET requests to /mcp, route to mounted SSE app at /mcp/
+            if scope.get("method") == "GET" and scope.get("path") == "/mcp":
                 scope["path"] = "/mcp/"
+
             headers = scope.get("headers", [])
             new_headers = []
             for k, v in headers:
@@ -147,6 +149,85 @@ def create_app() -> FastAPI:
             service=SERVER_NAME,
             database="connected" if db_ok else "error",
         )
+
+    # -------------------------------------------------------------
+    # Streamable HTTP MCP JSON-RPC Handler (Gemini & modern MCP clients)
+    # -------------------------------------------------------------
+    @app.post("/mcp", tags=["MCP"])
+    @app.post("/mcp/", tags=["MCP"])
+    async def mcp_post_handler(request: Request):
+        """Handle Streamable HTTP MCP JSON-RPC POST requests from Gemini and modern clients."""
+        try:
+            payload = await request.json()
+        except Exception:
+            return JSONResponse({"jsonrpc": "2.0", "error": {"code": -32700, "message": "Parse error"}}, status_code=400)
+
+        method = payload.get("method")
+        req_id = payload.get("id")
+
+        if method == "initialize":
+            return {
+                "jsonrpc": "2.0",
+                "id": req_id,
+                "result": {
+                    "protocolVersion": payload.get("params", {}).get("protocolVersion", "2024-11-05"),
+                    "capabilities": {
+                        "tools": {"listChanged": False},
+                        "resources": {"subscribe": False, "listChanged": False},
+                        "prompts": {"listChanged": False},
+                    },
+                    "serverInfo": {"name": SERVER_NAME, "version": SERVER_VERSION},
+                },
+            }
+        elif method == "tools/list":
+            tools = await mcp_app_instance.list_tools()
+            tools_list = []
+            for t in tools:
+                schema = getattr(t, "inputSchema", getattr(t, "parameters", None))
+                if schema is None or not isinstance(schema, dict):
+                    schema = {"type": "object", "properties": {}}
+                tools_list.append({
+                    "name": t.name,
+                    "description": t.description or "",
+                    "inputSchema": schema,
+                })
+            return {"jsonrpc": "2.0", "id": req_id, "result": {"tools": tools_list}}
+        elif method == "tools/call":
+            params = payload.get("params", {})
+            name = params.get("name")
+            args = params.get("arguments", {})
+            try:
+                res = await mcp_app_instance.call_tool(name, args)
+                content = []
+                if hasattr(res, "content"):
+                    for item in res.content:
+                        if hasattr(item, "text"):
+                            content.append({"type": "text", "text": item.text})
+                        elif hasattr(item, "data"):
+                            content.append({
+                                "type": "image",
+                                "data": getattr(item, "data", ""),
+                                "mimeType": getattr(item, "mimeType", "image/png"),
+                            })
+                return {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "result": {"content": content, "isError": getattr(res, "is_error", False)},
+                }
+            except Exception as e:
+                return {
+                    "jsonrpc": "2.0",
+                    "id": req_id,
+                    "result": {"content": [{"type": "text", "text": f"Error executing {name}: {e}"}], "isError": True},
+                }
+        elif method in ("resources/list", "prompts/list", "ping"):
+            key = "resources" if "resources" in method else ("prompts" if "prompts" in method else None)
+            res = {key: []} if key else {}
+            return {"jsonrpc": "2.0", "id": req_id, "result": res}
+        elif method == "notifications/initialized":
+            return Response(status_code=status.HTTP_200_OK)
+
+        return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32601, "message": f"Method '{method}' not found"}}
 
     # -------------------------------------------------------------
     # REST Endpoints for ChatGPT Actions and Web Clients

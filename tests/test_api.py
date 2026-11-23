@@ -25,6 +25,47 @@ def test_root_endpoint(client):
     assert res_head.status_code == 200
 
 
+def test_mcp_jsonrpc_streamable_http(client):
+    # 1. Test initialize (used by Gemini & Streamable HTTP clients)
+    init_res = client.post("/mcp", json={
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {"protocolVersion": "2024-11-05"}
+    })
+    assert init_res.status_code == 200
+    init_data = init_res.json()
+    assert init_data["id"] == 1
+    assert "tools" in init_data["result"]["capabilities"]
+
+    # 2. Test tools/list (used by Gemini & Streamable HTTP clients)
+    tools_res = client.post("/mcp", json={
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/list",
+        "params": {}
+    })
+    assert tools_res.status_code == 200
+    tools_data = tools_res.json()
+    assert "tools" in tools_data["result"]
+    assert len(tools_data["result"]["tools"]) == 10
+
+    # 3. Test tools/call (used by Gemini & Streamable HTTP clients)
+    call_res = client.post("/mcp", json={
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "tools/call",
+        "params": {
+            "name": "list_departments",
+            "arguments": {"force_refresh": False}
+        }
+    })
+    assert call_res.status_code == 200
+    call_data = call_res.json()
+    assert call_data["result"]["isError"] is False
+    assert len(call_data["result"]["content"]) > 0
+
+
 def test_health_check(client):
     response = client.get("/health")
     assert response.status_code == 200
