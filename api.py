@@ -49,6 +49,33 @@ class HealthResponse(BaseModel):
     database: str
 
 
+class MCPProxyMiddleware:
+    """Pure ASGI middleware to normalize paths and host headers for the MCP SSE sub-app.
+
+    Avoids BaseHTTPMiddleware issues with streaming SSE, rewrites /mcp to /mcp/,
+    and normalizes Host to localhost so FastMCP DNS rebinding allows cloud proxies (Render).
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] == "http" and scope.get("path", "").startswith("/mcp"):
+            if scope["path"] == "/mcp":
+                scope["path"] = "/mcp/"
+            headers = scope.get("headers", [])
+            new_headers = []
+            for k, v in headers:
+                if k.lower() == b"host":
+                    new_headers.append((b"host", b"localhost"))
+                elif k.lower() == b"origin":
+                    continue
+                else:
+                    new_headers.append((k, v))
+            scope["headers"] = new_headers
+        await self.app(scope, receive, send)
+
+
 def create_app() -> FastAPI:
     """Create configured production FastAPI application."""
     service = CollectionService()
@@ -75,6 +102,9 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # Enable pure ASGI proxy middleware for MCP cloud compatibility
+    app.add_middleware(MCPProxyMiddleware)
+
     # Enable CORS for all origins (required for web clients and ChatGPT Actions)
     app.add_middleware(
         CORSMiddleware,
@@ -83,13 +113,6 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
-    @app.middleware("http")
-    async def mcp_slash_middleware(request: Request, call_next):
-        """Ensure /mcp without trailing slash routes directly to the mounted SSE app."""
-        if request.url.path == "/mcp":
-            request.scope["path"] = "/mcp/"
-        return await call_next(request)
 
     # -------------------------------------------------------------
     # Root & Health Check (Render, Cloud Run, Kubernetes, Docker)
