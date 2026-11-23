@@ -279,12 +279,24 @@ def create_app() -> FastAPI:
         return summary
 
     # -------------------------------------------------------------
-    # Mount MCP SSE Application for Remote MCP Clients
+    # Mount MCP SSE Application for Remote MCP Clients (ChatGPT, Claude, Cursor)
     # -------------------------------------------------------------
     try:
-        sse_app = mcp_app_instance.sse_app()
+        from mcp.server.transport_security import TransportSecuritySettings
+        from starlette.routing import Route
+
+        # Disable DNS rebinding check so cloud proxies (Render, Cloudflare) work without 421 Host error
+        ts = TransportSecuritySettings(enable_dns_rebinding_protection=False)
+        sse_app = mcp_app_instance.sse_app(sse_path="/", transport_security=ts)
+
+        # Also support /sse subpath so both /mcp and /mcp/sse work seamlessly
+        for r in sse_app.routes:
+            if getattr(r, "path", "") == "/":
+                sse_app.routes.append(Route("/sse", endpoint=r.endpoint, methods=["GET", "HEAD"]))
+                break
+
         app.mount("/mcp", sse_app)
-        logger.info("Mounted MCP SSE App at /mcp")
+        logger.info("Mounted MCP SSE App at /mcp (supporting / and /sse)")
     except Exception as e:
         logger.warning(f"Could not mount MCP SSE sub-app: {e}")
 
