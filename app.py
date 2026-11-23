@@ -170,11 +170,17 @@ with gr.Blocks(title="DIU Question MCP & REST Server") as demo:
                 """
             )
 
-# 4. Mount Gradio to FastAPI so all REST & MCP endpoints remain accessible
-app = gr.mount_gradio_app(api_app, demo, path="/")
+# 4. Attach FastAPI REST, OpenAPI & MCP routes directly onto demo.app
+for r in api_app.routes:
+    if hasattr(r, "path") and r.path not in [x.path for x in demo.app.routes if hasattr(x, "path")]:
+        demo.app.routes.append(r)
+
+from mcp_server.tools import create_mcp_server
+mcp_server_instance = create_mcp_server(service=service)
+demo.app.mount("/mcp", mcp_server_instance.sse_app())
+
+# Expose app for ASGI servers and launch demo for Hugging Face Spaces
+app = demo.app
 
 if __name__ == "__main__":
-    import uvicorn
-    port = int(os.getenv("PORT", "7860"))
-    logger.info(f"Starting Unified Gradio + FastAPI Server on port {port}...")
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    demo.launch()
