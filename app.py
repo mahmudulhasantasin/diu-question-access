@@ -183,4 +183,5 @@ demo.app.mount("/mcp", mcp_server_instance.sse_app())
 app = demo.app
 
 if __name__ == "__main__":
-    demo.launch()
+    demo.launch(server_name="0.0.0.0", server_port=7860, ssr_mode=False)
+    demo.block_thread()
