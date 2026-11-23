@@ -198,17 +198,31 @@ def create_app() -> FastAPI:
             args = params.get("arguments", {})
             try:
                 res = await mcp_app_instance.call_tool(name, args)
-                content = []
+                items = []
                 if hasattr(res, "content"):
-                    for item in res.content:
-                        if hasattr(item, "text"):
-                            content.append({"type": "text", "text": item.text})
-                        elif hasattr(item, "data"):
-                            content.append({
-                                "type": "image",
-                                "data": getattr(item, "data", ""),
-                                "mimeType": getattr(item, "mimeType", "image/png"),
-                            })
+                    items = res.content
+                elif isinstance(res, (list, tuple)):
+                    items = res
+                elif res is not None:
+                    items = [res]
+
+                content = []
+                for item in items:
+                    if hasattr(item, "text"):
+                        content.append({"type": "text", "text": item.text})
+                    elif hasattr(item, "data"):
+                        content.append({
+                            "type": "image",
+                            "data": getattr(item, "data", ""),
+                            "mimeType": getattr(item, "mimeType", "image/png"),
+                        })
+                    elif isinstance(item, str):
+                        content.append({"type": "text", "text": item})
+                    elif isinstance(item, dict):
+                        content.append({"type": "text", "text": json.dumps(item, indent=2)})
+                    else:
+                        content.append({"type": "text", "text": str(item)})
+
                 return {
                     "jsonrpc": "2.0",
                     "id": req_id,
