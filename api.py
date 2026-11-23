@@ -289,18 +289,35 @@ def create_app() -> FastAPI:
     # Mount MCP SSE Application for Remote MCP Clients (ChatGPT, Claude, Cursor)
     # -------------------------------------------------------------
     try:
-        from mcp.server.transport_security import TransportSecuritySettings
+        import inspect
         from starlette.routing import Route
 
-        # Disable DNS rebinding check so cloud proxies (Render, Cloudflare) work without 421 Host error
-        ts = TransportSecuritySettings(enable_dns_rebinding_protection=False)
-        sse_app = mcp_app_instance.sse_app(sse_path="/", transport_security=ts)
+        sig = inspect.signature(mcp_app_instance.sse_app)
+        kwargs = {}
+        if "transport_security" in sig.parameters:
+            try:
+                from mcp.server.transport_security import TransportSecuritySettings
+                kwargs["transport_security"] = TransportSecuritySettings(enable_dns_rebinding_protection=False)
+            except Exception:
+                pass
+        if "sse_path" in sig.parameters:
+            kwargs["sse_path"] = "/"
 
-        # Also support /sse subpath so both /mcp and /mcp/sse work seamlessly
+        sse_app = mcp_app_instance.sse_app(**kwargs)
+
+        # Ensure both / and /sse routes exist inside sse_app
+        sse_endpoint = None
         for r in sse_app.routes:
-            if getattr(r, "path", "") == "/":
-                sse_app.routes.append(Route("/sse", endpoint=r.endpoint, methods=["GET", "HEAD"]))
+            if getattr(r, "path", "") in ("/", "/sse"):
+                sse_endpoint = r.endpoint
                 break
+
+        if sse_endpoint:
+            existing_paths = [getattr(r, "path", "") for r in sse_app.routes]
+            if "/" not in existing_paths:
+                sse_app.routes.append(Route("/", endpoint=sse_endpoint, methods=["GET", "HEAD"]))
+            if "/sse" not in existing_paths:
+                sse_app.routes.append(Route("/sse", endpoint=sse_endpoint, methods=["GET", "HEAD"]))
 
         app.mount("/mcp", sse_app)
         logger.info("Mounted MCP SSE App at /mcp (supporting / and /sse)")
