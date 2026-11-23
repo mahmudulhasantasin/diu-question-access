@@ -20,6 +20,15 @@ preview_service = PreviewService(repo=service.repo)
 
 
 # 2. Gradio Interactive Functions
+try:
+    import spaces
+    gpu_decorator = spaces.GPU
+except Exception:
+    def gpu_decorator(fn):
+        return fn
+
+
+@gpu_decorator
 async def search_questions_ui(department: str, course: str, semester: str, exam_type: str):
     """Search OurDIU for exam questions and return a formatted markdown table."""
     dept = department.strip() or "CSE"
@@ -71,6 +80,7 @@ async def search_questions_ui(department: str, course: str, semester: str, exam_
         return f"### ❌ Error during search: {e}", None
 
 
+@gpu_decorator
 async def preview_page_ui(file_id: str, page_number: int):
     """Render a high-resolution PNG preview of the specified question page in-memory."""
     fid = file_id.strip()
