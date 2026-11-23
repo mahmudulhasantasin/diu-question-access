@@ -238,7 +238,7 @@ python server.py --transport stdio
 
 ---
 
-## ⚖️ Disclaimer & Attribution (দায়মুক্তি ও কৃতজ্ঞতা স্বীকার)
+## ⚖️ Disclaimer & Attribution
 
 ### 1. Attribution & Source Credits
 This project programmatically indexes public examination question papers collected and archived by the student community at **[OurDIU](https://ourdiu.com/)**. We express our sincere gratitude and appreciation to the OurDIU team, student contributors, and class representatives (CRs) for voluntarily archiving these academic resources.
