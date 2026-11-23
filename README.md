@@ -5,12 +5,16 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.139-009688.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
 [![Render](https://img.shields.io/badge/Render-Deployed%20Live-brightgreen.svg?logo=render)](https://diu-question-access.onrender.com)
-[![Tests](https://img.shields.io/badge/Tests-36%20Passed-success.svg)]()
+[![Tests](https://img.shields.io/badge/Tests-38%20Passed-success.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 A high-performance **Model Context Protocol (MCP)** and **FastAPI REST API** server that dynamically discovers, indexes, streams, and delivers Daffodil International University (DIU) examination question papers from the OurDIU repository.
 
-Engineered for seamless integration with **ChatGPT (Custom MCP Plugins & Custom GPT Actions), Claude Desktop, Cursor IDE, Windsurf, and Web Browsers**.
+Engineered with a **Dual-Protocol Engine** for universal compatibility across:
+- **Google Gemini** (Connected Apps via Streamable HTTP JSON-RPC)
+- **OpenAI ChatGPT** (Custom MCP Plugin via SSE & Custom GPT Actions via OpenAPI)
+- **Claude Desktop, Cursor, Windsurf** (SSE & stdio)
+- **Web Browsers & Mobile Clients** (Interactive Swagger UI & REST APIs)
 
 ---
 
@@ -21,47 +25,68 @@ The server is deployed live on cloud infrastructure:
 | Endpoint | URL | Description |
 | :--- | :--- | :--- |
 | **Primary Root** | [https://diu-question-access.onrender.com/](https://diu-question-access.onrender.com/) | Live status & index summary |
-| **MCP SSE Service** | `https://diu-question-access.onrender.com/mcp` | Server-Sent Events endpoint for MCP clients |
+| **Universal MCP Endpoint** | `https://diu-question-access.onrender.com/mcp` | Dual-mode MCP: SSE (GET) & JSON-RPC (POST) |
 | **Interactive Docs** | [https://diu-question-access.onrender.com/docs](https://diu-question-access.onrender.com/docs) | Interactive Swagger UI (test in browser) |
 | **OpenAPI Specification** | [https://diu-question-access.onrender.com/openapi.json](https://diu-question-access.onrender.com/openapi.json) | OpenAPI 3.1 schema for ChatGPT Actions |
 | **Health Check** | [https://diu-question-access.onrender.com/health](https://diu-question-access.onrender.com/health) | Uptime and database health probe |
+
+> [!NOTE]
+> **Free Tier Cold Starts**: Render spins down inactive instances. The very first request after inactivity may take ~30–50 seconds to wake up. Subsequent requests respond instantly.
 
 ---
 
 ## 📖 How to Use (Integration Guide)
 
-### 1. Connect to ChatGPT as a Custom MCP Plugin
+### 1. Connect to Google Gemini (Connected Apps / Custom MCP)
 
-Use ChatGPT's native **Custom MCP Server** integration to connect directly to the server:
+Google Gemini natively supports connecting to custom MCP servers via Streamable HTTP:
+
+1. Open **[Google Gemini](https://gemini.google.com)** in your browser.
+2. Click on **Settings** (or the **Tools / Extensions / Connected Apps** icon) $\to$ Select **Connect to an MCP server**.
+3. In the dialog, enter the **MCP server URL**:
+   ```text
+   https://diu-question-access.onrender.com/mcp
+   ```
+4. Click **Next** / **Connect**. *(No authentication required — leave settings as default)*.
+5. Gemini will automatically discover all 10 tools (`collect_questions`, `search_questions`, `list_departments`, `list_courses`, `preview_question_page`, etc.).
+6. Ask Gemini directly in the chat:
+   * *"DIU CSE ডিপার্টমেন্টের Art of Living কোর্সের Final পরীক্ষার প্রশ্নপত্রগুলো দাও"*
+   * *"Show me previous Midterm questions for Operating Systems at DIU"*
+
+---
+
+### 2. Connect to ChatGPT as a Custom MCP Plugin
+
+ChatGPT supports MCP servers via Server-Sent Events (SSE):
 
 1. Open **[ChatGPT](https://chatgpt.com)** in your browser.
 2. Go to **Plugins** / **Developer Settings** $\to$ Click **Add custom MCP server**.
 3. Fill in the connection form:
    * **Name**: `DIU Question Access`
-   * **Description**: `Search past DIU examination question papers with high-resolution page previews.`
+   * **Description**: `Search and retrieve DIU examination question papers with page previews.`
    * **Connection**: Select **Server URL**
    * **Server URL**: `https://diu-question-access.onrender.com/mcp`
    * **Authentication**: Select **No authentication** (None)
-4. Check the box: ☑️ *"I understand and want to continue"*.
+4. Check the confirmation box: ☑️ *"I understand and want to continue"*.
 5. Click **Create as a plugin**.
-6. The plugin will be created and activated. You can now chat directly with ChatGPT to query and preview question papers!
+6. The plugin will be created and activated immediately.
 
 ---
 
-### 2. Connect to ChatGPT as a Custom GPT (Actions)
+### 3. Connect to ChatGPT as a Custom GPT (Actions)
 
-If you prefer building a dedicated **Custom GPT** with the OpenAPI schema:
+If you prefer building a dedicated **Custom GPT** with full control over system instructions:
 
-1. In ChatGPT, go to **Explore GPTs** $\to$ Click **+ Create** (top right) $\to$ Select the **Configure** tab.
-2. Configure basic info:
+1. In ChatGPT, navigate to **Explore GPTs** $\to$ Click **+ Create** $\to$ Select **Configure**.
+2. Configure general info:
    * **Name**: `DIU Exam Assistant`
-   * **Description**: `Search, summarize, and preview past Daffodil International University question papers.`
+   * **Description**: `Search, transcribe, and preview past Daffodil International University question papers.`
 3. Scroll down to **Actions** $\to$ Click **Create new action**.
 4. In the **Import from URL** input, paste:
    ```text
    https://diu-question-access.onrender.com/openapi.json
    ```
-5. Click **Import**. ChatGPT will auto-populate all endpoints (`search_questions`, `collect_questions`, `list_departments`, `preview_question_page`, etc.).
+5. Click **Import**. ChatGPT will auto-populate all endpoints.
 6. Set **Authentication**: `None`.
 7. Set **Privacy Policy**: `https://ourdiu.com`
 8. In the **Instructions** box, paste:
@@ -70,9 +95,9 @@ If you prefer building a dedicated **Custom GPT** with the OpenAPI schema:
 
 ---
 
-### 3. Connect to Claude Desktop
+### 4. Connect to Claude Desktop
 
-Connect Claude Desktop to the online cloud server or run locally via `stdio`:
+Connect Claude Desktop to the cloud service via SSE or run locally via `stdio`:
 
 #### Option A: Remote Cloud Connection (SSE)
 Add to your Claude configuration (`%APPDATA%\Claude\claude_desktop_config.json` on Windows or `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
@@ -106,40 +131,41 @@ Add to your Claude configuration (`%APPDATA%\Claude\claude_desktop_config.json` 
 
 ---
 
-### 4. Direct Browser Usage (Interactive Swagger UI)
+### 5. Direct Browser Usage (Interactive Swagger UI)
 
-You can explore and test all APIs directly without any AI client:
+You can explore and test all endpoints directly without any AI client:
 
 1. Visit: [https://diu-question-access.onrender.com/docs](https://diu-question-access.onrender.com/docs)
 2. Click on any endpoint (e.g., `GET /api/departments` or `GET /api/courses`).
 3. Click **Try it out** $\to$ Enter parameters $\to$ Click **Execute**.
-4. Instant JSON responses or rendered page images will be displayed directly in your browser.
+4. View JSON data or rendered page images directly in your browser.
 
 ---
 
 ## 💬 Example Prompts to Try
 
-Once connected to ChatGPT or Claude, try asking questions like:
+Once connected to Gemini, ChatGPT, or Claude, try asking:
 
-### 1. Department & Course Exploration
-* *"What departments are available in the DIU Question Bank?"*
-* *"Show me all courses listed under the Computer Science and Engineering (CSE) department."*
+### 1. ডিপার্টমেন্ট ও কোর্সের প্রশ্ন খোঁজা (Department & Course Exploration)
+* *"DIU তে কী কী ডিপার্টমেন্টের প্রশ্নব্যাংক আছে?"*
+* *"Show all courses under the Computer Science and Engineering (CSE) department."*
 
-### 2. Finding Question Papers
+### 2. সেমিস্টার ও পরীক্ষা অনুযায়ী প্রশ্ন বের করা (Finding Exam Papers)
+* *"CSE ডিপার্টমেন্টের Art of Living কোর্সের Final পরীক্ষার সবগুলো প্রশ্ন দাও"*
 * *"Find previous Midterm exam questions for Operating Systems from Fall 2023 and Spring 2024."*
 * *"Are there any Final exam papers for 'Algorithms' in the Software Engineering department?"*
 
-### 3. Multimodal Page Preview (Vision Analysis)
-* *"Can you preview page 1 of the Database Systems Midterm question to check the ER diagram?"*
+### 3. ডায়াগ্রাম ও ছবির পেজ প্রিভিউ (Multimodal Vision Analysis)
+* *"Database Systems পরীক্ষার প্রশ্নপত্রের ১ নম্বর পেজটি প্রিভিউ করে ER ডায়াগ্রামটি বিশ্লেষণ কর।"*
 * *"Show me the schematic or circuit diagram from question 3 of the Digital Logic Design exam paper."*
-*(The server renders the exact PDF page as a high-resolution PNG image on-the-fly, allowing vision AI to analyze circuits, flowcharts, math equations, and handwritten notes).*
+*(The server renders the exact PDF page as a high-resolution PNG image on-the-fly, allowing vision AI to analyze circuits, flowcharts, math equations, and tables).*
 
-### 4. Topic Analysis & Exam Preparation
-* *"Analyze the question patterns across the last 3 semesters for Artificial Intelligence. What topics appear most frequently?"*
-* *"Create a practice quiz based on the Midterm questions collected for Compiler Design."*
+### 4. পরীক্ষার প্রস্তুতি ও সাজেশন (Exam Preparation & Analysis)
+* *"Artificial Intelligence কোর্সের বিগত ৩টি সেমিস্টারের প্রশ্ন বিশ্লেষণ করে সবচেয়ে কমন টপিকগুলো বের কর।"*
+* *"Compiler Design পরীক্ষার Midterm প্রশ্নের ভিত্তিতে একটি প্র্যাকটিস কুইজ তৈরি করে দাও।"*
 
-### 5. Downloading Original PDFs
-* *"Give me the direct PDF download link for the Spring 2024 Object Oriented Programming final exam."*
+### 5. সরাসরি PDF ডাউনলোড লিংক (Direct Download Links)
+* *"Spring 2024 Object Oriented Programming Final পরীক্ষার অরিজিনাল PDF ডাউনলোড লিংক দাও।"*
 
 ---
 
@@ -169,7 +195,8 @@ Once connected to ChatGPT or Claude, try asking questions like:
 | `GET` | `/health` | Service health status. |
 | `GET` | `/docs` | Interactive Swagger documentation. |
 | `GET` | `/openapi.json` | OpenAPI 3.1 specification for ChatGPT Actions. |
-| `GET` | `/mcp` | MCP Server-Sent Events (SSE) streaming endpoint. |
+| `GET` | `/mcp` | MCP Server-Sent Events (SSE) streaming endpoint (ChatGPT/Claude). |
+| `POST` | `/mcp` | MCP Streamable HTTP JSON-RPC endpoint (Gemini). |
 | `GET` | `/api/departments` | Discovered department list. |
 | `GET` | `/api/courses` | Department courses by query parameter. |
 | `GET` | `/api/semesters` | Available semesters for a given course. |
@@ -195,14 +222,14 @@ source .venv/bin/activate  # or .\.venv\Scripts\Activate.ps1 on Windows
 pip install -r requirements.txt
 ```
 
-### 2. Automated Tests (36 Tests)
+### 2. Automated Tests (38 Tests Passing 100%)
 ```bash
 python -m pytest -v
 ```
 
 ### 3. Run Locally
 ```bash
-# REST API & MCP SSE
+# REST API & MCP HTTP Server (Port 8000)
 python server.py --transport http --host 0.0.0.0 --port 8000
 
 # stdio mode (Claude Desktop)
