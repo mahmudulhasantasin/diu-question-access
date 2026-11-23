@@ -2,229 +2,92 @@
 
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue.svg)](https://www.python.org/)
 [![MCP Specification](https://img.shields.io/badge/MCP-Protocol%20v2.3-purple.svg)](https://modelcontextprotocol.io/)
-[![Framework](https://img.shields.io/badge/FastAPI-0.139-009688.svg)](https://fastapi.tiangolo.com/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.139-009688.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
-[![Render](https://img.shields.io/badge/Render-Deploy%20Ready-black.svg?logo=render)](https://render.com)
+[![Render](https://img.shields.io/badge/Render-Deployed%20Live-brightgreen.svg?logo=render)](https://diu-question-access.onrender.com)
 [![Tests](https://img.shields.io/badge/Tests-36%20Passed-success.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-A high-performance **Model Context Protocol (MCP)** and **FastAPI REST API** server designed to dynamically discover, index, stream, and deliver examination question papers from the OurDIU repository.
+A high-performance **Model Context Protocol (MCP)** and **FastAPI REST API** server that dynamically discovers, indexes, streams, and delivers Daffodil International University (DIU) examination question papers from the OurDIU repository.
 
-Engineered for seamless integration with **ChatGPT (Custom GPT Actions), Claude Desktop, Cursor IDE, and Cloud Hosting (Render, Fly.io, Railway, Docker)**.
-
----
-
-## Key Features
-
-* **Binary Integrity**: Original PDF documents are downloaded and served directly without lossy conversions or vectorization.
-* **On-Demand Page Preview (Multimodal Vision)**: Generates high-resolution PNG page images directly in-memory using `pypdfium2` so vision-enabled models (Claude 3.7 / 3.5 Sonnet, ChatGPT Vision) can inspect diagrams, circuit schematics, charts, and handwritten questions.
-* **Zero-Storage Cloud Mode**: Streams PDFs and page images directly through memory buffers, avoiding disk exhaustion on free cloud hosting instances.
-* **Storage Quota & Auto-Cleanup**: Enforces an automated LRU cache eviction policy to maintain local disk usage within user-defined quotas (default: $\le 50\text{ MB}$).
-* **Universal Transports**:
-  * **stdio**: Local IPC for Claude Desktop, Cursor, and VS Code.
-  * **HTTP / REST**: OpenAPI 3.1 endpoints with Swagger UI for ChatGPT Custom Actions and web clients.
-  * **SSE**: Server-Sent Events mounted at `/mcp` for remote MCP connections.
-* **Dynamic Discovery**: Scrapes real-time department, course, semester, and exam category metadata without hardcoded assumptions.
-* **IPC Crash Resilience**: Delivers clean question text transcriptions in tool responses to prevent client IPC buffer overruns on large documents.
+Engineered for seamless integration with **ChatGPT (Custom MCP Plugins & Custom GPT Actions), Claude Desktop, Cursor IDE, Windsurf, and Web Browsers**.
 
 ---
 
-## System Architecture
+## 🌐 Live Service Endpoints
 
-```
-  +-------------------------------------------------------------+
-  |                         AI Clients                          |
-  |     Claude Desktop  |  ChatGPT GPT-4o  |  Cursor IDE        |
-  +--------------+------------------------------+---------------+
-                 |                              |
-          JSON-RPC (stdio)              HTTP / REST / SSE
-                 |                              |
-  +--------------v------------------------------v---------------+
-  |                 DIU Question Server Engine                  |
-  |                    (server.py / api.py)                     |
-  +-----------------------------+-------------------------------+
-                                |
-         +----------------------+----------------------+
-         |                                             |
-+--------v----------------------+             +--------v----------------------+
-|       MCP Tools Engine        |             |        FastAPI REST API       |
-| - list_departments            |             | - GET  / (Root & Health Index)|
-| - list_courses                |             | - GET  /health                |
-| - list_semesters              |             | - GET  /docs (Swagger UI)     |
-| - list_exam_types             |             | - GET  /openapi.json          |
-| - search_questions            |             | - GET  /mcp (SSE Endpoint)    |
-| - collect_questions           |             | - POST /api/search            |
-| - get_pdf_file                |             | - POST /api/collect           |
-| - preview_question_page       |             | - GET  /api/files             |
-| - list_collected_files        |             | - GET  /api/files/{id}/pages  |
-| - get_collection_summary      |             | - GET  /api/files/{id}/down.. |
-+-------------------------------+             +-------------------------------+
-```
+The server is deployed live on cloud infrastructure:
+
+| Endpoint | URL | Description |
+| :--- | :--- | :--- |
+| **Primary Root** | [https://diu-question-access.onrender.com/](https://diu-question-access.onrender.com/) | Live status & index summary |
+| **MCP SSE Service** | `https://diu-question-access.onrender.com/mcp` | Server-Sent Events endpoint for MCP clients |
+| **Interactive Docs** | [https://diu-question-access.onrender.com/docs](https://diu-question-access.onrender.com/docs) | Interactive Swagger UI (test in browser) |
+| **OpenAPI Specification** | [https://diu-question-access.onrender.com/openapi.json](https://diu-question-access.onrender.com/openapi.json) | OpenAPI 3.1 schema for ChatGPT Actions |
+| **Health Check** | [https://diu-question-access.onrender.com/health](https://diu-question-access.onrender.com/health) | Uptime and database health probe |
 
 ---
 
-## Directory Layout
+## 📖 How to Use (Integration Guide)
 
-```
-diu-question/
-├── api.py                    # FastAPI REST API & OpenAPI 3.1 server
-├── server.py                 # Multi-transport launcher (stdio, http, sse)
-├── config.py                 # Central configuration and environment loader
-├── Dockerfile                # Production multi-stage Docker build
-├── docker-compose.yml        # Multi-container orchestration
-├── pyproject.toml            # Project metadata and test configuration
-├── requirements.txt          # Production dependencies
-│
-├── scraper/                  # Dynamic discovery & web extraction
-│   ├── client.py             # Resilient async HTTP client with stream decoding
-│   ├── departments.py        # Department extraction
-│   ├── courses.py            # Course catalog discovery
-│   ├── semesters.py          # Semester parsing and normalization
-│   ├── exams.py              # Exam category filtering
-│   ├── pagination.py         # Multi-page crawler traversal
-│   └── pdf_extractor.py      # PDF URL and submission extraction
-│
-├── downloader/               # File downloading, validation & storage
-│   ├── pdf_downloader.py     # Binary downloader with retry mechanics
-│   ├── validator.py          # PDF header and checksum validation
-│   └── storage.py            # Local path sanitization and LRU cleanup
-│
-├── services/                 # Domain logic and orchestration
-│   ├── collection_service.py # Core search & collection coordinator
-│   ├── preview_service.py    # On-the-fly page rendering for AI vision
-│   ├── cache_service.py      # Cache validation logic
-│   └── metadata_service.py   # Statistical reporting
-│
-├── database/                 # SQLite persistence layer
-│   ├── models.py             # Data entities & schemas
-│   └── repository.py         # SQLite database operations
-│
-└── tests/                    # Automated test suite (36 passing tests)
-    ├── test_api.py           # REST endpoints, Root, and OpenAPI tests
-    ├── test_downloader.py    # Download validation tests
-    ├── test_filters.py       # Semester & exam normalization tests
-    ├── test_hf_app.py        # Application integration tests
-    ├── test_mcp.py           # MCP tool execution tests
-    ├── test_preview_and_storage.py # Vision preview & LRU storage tests
-    └── test_scraper.py       # Scraper and parser tests
-```
+### 1. Connect to ChatGPT as a Custom MCP Plugin
+
+Use ChatGPT's native **Custom MCP Server** integration to connect directly to the server:
+
+1. Open **[ChatGPT](https://chatgpt.com)** in your browser.
+2. Go to **Plugins** / **Developer Settings** $\to$ Click **Add custom MCP server**.
+3. Fill in the connection form:
+   * **Name**: `DIU Question Access`
+   * **Description**: `Search past DIU examination question papers with high-resolution page previews.`
+   * **Connection**: Select **Server URL**
+   * **Server URL**: `https://diu-question-access.onrender.com/mcp`
+   * **Authentication**: Select **No authentication** (None)
+4. Check the box: ☑️ *"I understand and want to continue"*.
+5. Click **Create as a plugin**.
+6. The plugin will be created and activated. You can now chat directly with ChatGPT to query and preview question papers!
 
 ---
 
-## Setup & Local Installation
+### 2. Connect to ChatGPT as a Custom GPT (Actions)
 
-### 1. Clone the Repository
-```bash
-git clone https://github.com/mahmudulhasantasin/diu-question-access.git
-cd diu-question-access
-```
+If you prefer building a dedicated **Custom GPT** with the OpenAPI schema:
 
-### 2. Environment Setup
-```bash
-# Windows (PowerShell)
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-
-# Linux / macOS
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-### 3. Install Dependencies
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Configuration (Optional)
-Create a `.env` file to configure custom host, port, or storage limits:
-```env
-DIU_SERVER_HOST=0.0.0.0
-DIU_SERVER_PORT=8000
-DIU_DATA_DIR=data
-DIU_MAX_STORAGE_MB=50
-```
-
----
-
-## Running the Automated Tests
-
-Execute the 36 automated tests covering all scrapers, downloaders, MCP tools, and REST endpoints:
-```bash
-python -m pytest -v
-```
-
----
-
-## Running the Server
-
-### 1. Local MCP stdio Mode (Claude Desktop / Cursor)
-Used for local desktop AI assistants:
-```bash
-python server.py --transport stdio
-```
-
-### 2. Production REST & MCP SSE Mode
-Runs FastAPI with interactive Swagger UI and mounted MCP SSE:
-```bash
-python server.py --transport http --host 0.0.0.0 --port 8000
-```
-Interactive endpoints:
-* **Root Index**: `http://localhost:8000/`
-* **Swagger UI Docs**: `http://localhost:8000/docs`
-* **OpenAPI 3.1 Schema**: `http://localhost:8000/openapi.json`
-* **Health Check**: `http://localhost:8000/health`
-* **MCP SSE Endpoint**: `http://localhost:8000/mcp`
-
-### 3. Docker Container
-```bash
-docker compose up -d --build
-```
-
----
-
-## Free Cloud Deployment (Render)
-
-Deploy this service online for **free** on Render:
-
-1. Create a free account at [Render.com](https://render.com).
-2. Click **New +** $\to$ **Web Service**.
-3. Connect your GitHub repository: `diu-question-access`.
-4. Render automatically detects the `Dockerfile` in the root:
-   * **Runtime**: `Docker`
-   * **Instance Type**: `Free`
-5. Click **Deploy Web Service**.
-6. Render builds the container, binds to port `8000`, and passes the health check.
-7. You will receive a permanent HTTPS URL, for example: `https://diu-question-access.onrender.com`.
-
----
-
-## Connecting with AI Clients
-
-### 1. ChatGPT (Custom GPT Actions)
-Connect the online Render service to ChatGPT:
-
-1. Open ChatGPT and go to **Explore GPTs** $\to$ **Create a GPT** $\to$ **Configure**.
-2. Scroll to the bottom and click **Create new action**.
-3. In the **Import from URL** input, enter your Render OpenAPI schema URL:
+1. In ChatGPT, go to **Explore GPTs** $\to$ Click **+ Create** (top right) $\to$ Select the **Configure** tab.
+2. Configure basic info:
+   * **Name**: `DIU Exam Assistant`
+   * **Description**: `Search, summarize, and preview past Daffodil International University question papers.`
+3. Scroll down to **Actions** $\to$ Click **Create new action**.
+4. In the **Import from URL** input, paste:
+   ```text
+   https://diu-question-access.onrender.com/openapi.json
    ```
-   https://<your-render-service-name>.onrender.com/openapi.json
-   ```
-4. Click **Import**. ChatGPT will immediately configure all endpoints:
-   * Searching questions by department, course, and semester.
-   * Transcribing question text directly into the chat.
-   * Previewing high-resolution PNG page images for diagrams, math equations, and circuit schematics.
-   * Providing direct PDF download links.
-5. In GPT Instructions, specify:
-   > "You are an assistant for Daffodil International University students. Use the DIU Question actions to search past question papers, summarize them, and provide page preview images whenever users ask about diagrams or specific questions."
+5. Click **Import**. ChatGPT will auto-populate all endpoints (`search_questions`, `collect_questions`, `list_departments`, `preview_question_page`, etc.).
+6. Set **Authentication**: `None`.
+7. Set **Privacy Policy**: `https://ourdiu.com`
+8. In the **Instructions** box, paste:
+   > "You are an academic assistant for Daffodil International University (DIU) students. Use the DIU Question actions to search past question papers by department, course, and semester. Transcribe questions clearly, provide high-resolution page previews when diagrams or formulas are discussed, and share direct download links."
+9. Click **Save** (or **Publish**).
 
 ---
 
-### 2. Claude Desktop Integration
-Add the server entry to your Claude Desktop configuration file:
+### 3. Connect to Claude Desktop
 
-* **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-* **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+Connect Claude Desktop to the online cloud server or run locally via `stdio`:
 
+#### Option A: Remote Cloud Connection (SSE)
+Add to your Claude configuration (`%APPDATA%\Claude\claude_desktop_config.json` on Windows or `~/Library/Application Support/Claude/claude_desktop_config.json` on macOS):
+
+```json
+{
+  "mcpServers": {
+    "diu-question": {
+      "url": "https://diu-question-access.onrender.com/mcp"
+    }
+  }
+}
+```
+
+#### Option B: Local stdio Mode
 ```json
 {
   "mcpServers": {
@@ -243,11 +106,48 @@ Add the server entry to your Claude Desktop configuration file:
 
 ---
 
-## MCP Tools Reference (10 Tools)
+### 4. Direct Browser Usage (Interactive Swagger UI)
+
+You can explore and test all APIs directly without any AI client:
+
+1. Visit: [https://diu-question-access.onrender.com/docs](https://diu-question-access.onrender.com/docs)
+2. Click on any endpoint (e.g., `GET /api/departments` or `GET /api/courses`).
+3. Click **Try it out** $\to$ Enter parameters $\to$ Click **Execute**.
+4. Instant JSON responses or rendered page images will be displayed directly in your browser.
+
+---
+
+## 💬 Example Prompts to Try
+
+Once connected to ChatGPT or Claude, try asking questions like:
+
+### 1. Department & Course Exploration
+* *"What departments are available in the DIU Question Bank?"*
+* *"Show me all courses listed under the Computer Science and Engineering (CSE) department."*
+
+### 2. Finding Question Papers
+* *"Find previous Midterm exam questions for Operating Systems from Fall 2023 and Spring 2024."*
+* *"Are there any Final exam papers for 'Algorithms' in the Software Engineering department?"*
+
+### 3. Multimodal Page Preview (Vision Analysis)
+* *"Can you preview page 1 of the Database Systems Midterm question to check the ER diagram?"*
+* *"Show me the schematic or circuit diagram from question 3 of the Digital Logic Design exam paper."*
+*(The server renders the exact PDF page as a high-resolution PNG image on-the-fly, allowing vision AI to analyze circuits, flowcharts, math equations, and handwritten notes).*
+
+### 4. Topic Analysis & Exam Preparation
+* *"Analyze the question patterns across the last 3 semesters for Artificial Intelligence. What topics appear most frequently?"*
+* *"Create a practice quiz based on the Midterm questions collected for Compiler Design."*
+
+### 5. Downloading Original PDFs
+* *"Give me the direct PDF download link for the Spring 2024 Object Oriented Programming final exam."*
+
+---
+
+## 🛠️ MCP Tools Reference (10 Tools)
 
 | Tool Name | Parameters | Description |
 | :--- | :--- | :--- |
-| `list_departments` | `force_refresh: bool` | Returns all academic departments discovered dynamically from OurDIU. |
+| `list_departments` | `force_refresh: bool` | Returns all academic departments discovered from OurDIU. |
 | `list_courses` | `department: str, force_refresh: bool` | Returns courses under a specific department. |
 | `list_semesters` | `department: str, course: str` | Lists available semesters with existing papers for the course. |
 | `list_exam_types` | `department: str, course: str` | Lists exam categories (Midterm, Final, Quiz) for the course. |
@@ -260,7 +160,7 @@ Add the server entry to your Claude Desktop configuration file:
 
 ---
 
-## REST API Reference
+## 📡 REST API Reference
 
 | Method | Route | Description |
 | :--- | :--- | :--- |
@@ -269,7 +169,7 @@ Add the server entry to your Claude Desktop configuration file:
 | `GET` | `/health` | Service health status. |
 | `GET` | `/docs` | Interactive Swagger documentation. |
 | `GET` | `/openapi.json` | OpenAPI 3.1 specification for ChatGPT Actions. |
-| `GET` | `/mcp` | MCP Server-Sent Events (SSE) endpoint. |
+| `GET` | `/mcp` | MCP Server-Sent Events (SSE) streaming endpoint. |
 | `GET` | `/api/departments` | Discovered department list. |
 | `GET` | `/api/courses` | Department courses by query parameter. |
 | `GET` | `/api/semesters` | Available semesters for a given course. |
@@ -284,6 +184,33 @@ Add the server entry to your Claude Desktop configuration file:
 
 ---
 
-## License
+## 💻 Local Development & Testing
 
-This project is open-source and licensed under the MIT License.
+### 1. Installation
+```bash
+git clone https://github.com/mahmudulhasantasin/diu-question-access.git
+cd diu-question-access
+python -m venv .venv
+source .venv/bin/activate  # or .\.venv\Scripts\Activate.ps1 on Windows
+pip install -r requirements.txt
+```
+
+### 2. Automated Tests (36 Tests)
+```bash
+python -m pytest -v
+```
+
+### 3. Run Locally
+```bash
+# REST API & MCP SSE
+python server.py --transport http --host 0.0.0.0 --port 8000
+
+# stdio mode (Claude Desktop)
+python server.py --transport stdio
+```
+
+---
+
+## 📜 License
+
+This project is open-source and licensed under the [MIT License](LICENSE).
