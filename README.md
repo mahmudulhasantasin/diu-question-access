@@ -1,36 +1,25 @@
----
-title: DIU Question Access
-emoji: 🎓
-colorFrom: blue
-colorTo: indigo
-sdk: gradio
-sdk_version: 6.32.0
-app_file: app.py
-pinned: false
-suggested_hardware: cpu-basic
----
-
 # DIU Question Access — Production MCP & REST Server
 
 [![Python Version](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13%20%7C%203.14-blue.svg)](https://www.python.org/)
 [![MCP Specification](https://img.shields.io/badge/MCP-Protocol%20v2.3-purple.svg)](https://modelcontextprotocol.io/)
 [![Framework](https://img.shields.io/badge/FastAPI-0.139-009688.svg)](https://fastapi.tiangolo.com/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)](https://www.docker.com/)
+[![Render](https://img.shields.io/badge/Render-Deploy%20Ready-black.svg?logo=render)](https://render.com)
+[![Tests](https://img.shields.io/badge/Tests-36%20Passed-success.svg)]()
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-34%20Passed-success.svg)]()
 
 A high-performance **Model Context Protocol (MCP)** and **FastAPI REST API** server designed to dynamically discover, index, stream, and deliver examination question papers from the OurDIU repository.
 
-Engineered for seamless integration with **Claude Desktop, ChatGPT (Custom GPT Actions), Cursor IDE, and Cloud Hosting (Render, Fly.io, Railway, Docker)**.
+Engineered for seamless integration with **ChatGPT (Custom GPT Actions), Claude Desktop, Cursor IDE, and Cloud Hosting (Render, Fly.io, Railway, Docker)**.
 
 ---
 
-## Highlights
+## Key Features
 
-* **Binary Integrity**: Original PDF documents are downloaded and served without lossy conversions or vectorization.
-* **On-Demand Page Preview (Multimodal Vision)**: Generates high-resolution PNG page images directly in-memory so vision-enabled models (Claude, ChatGPT Vision) can inspect diagrams, circuit schematics, charts, and handwritten questions.
+* **Binary Integrity**: Original PDF documents are downloaded and served directly without lossy conversions or vectorization.
+* **On-Demand Page Preview (Multimodal Vision)**: Generates high-resolution PNG page images directly in-memory using `pypdfium2` so vision-enabled models (Claude 3.7 / 3.5 Sonnet, ChatGPT Vision) can inspect diagrams, circuit schematics, charts, and handwritten questions.
 * **Zero-Storage Cloud Mode**: Streams PDFs and page images directly through memory buffers, avoiding disk exhaustion on free cloud hosting instances.
-* **Storage Quota & Auto-Cleanup**: Enforces an automated LRU cache eviction policy to maintain local disk usage within user-defined quotas.
+* **Storage Quota & Auto-Cleanup**: Enforces an automated LRU cache eviction policy to maintain local disk usage within user-defined quotas (default: $\le 50\text{ MB}$).
 * **Universal Transports**:
   * **stdio**: Local IPC for Claude Desktop, Cursor, and VS Code.
   * **HTTP / REST**: OpenAPI 3.1 endpoints with Swagger UI for ChatGPT Custom Actions and web clients.
@@ -59,17 +48,17 @@ Engineered for seamless integration with **Claude Desktop, ChatGPT (Custom GPT A
          |                                             |
 +--------v----------------------+             +--------v----------------------+
 |       MCP Tools Engine        |             |        FastAPI REST API       |
-| - list_departments            |             | - GET  /health                |
-| - list_courses                |             | - GET  /docs (Swagger UI)     |
-| - list_semesters              |             | - GET  /openapi.json          |
-| - list_exam_types             |             | - POST /api/search            |
-| - search_questions            |             | - POST /api/collect           |
-| - collect_questions           |             | - GET  /api/files/{id}/pages  |
-| - get_pdf_file                |             | - GET  /api/files/{id}/down.. |
-| - preview_question_page (NEW) |             +-------------------------------+
-| - list_collected_files        |
-| - get_collection_summary      |
-+-------------------------------+
+| - list_departments            |             | - GET  / (Root & Health Index)|
+| - list_courses                |             | - GET  /health                |
+| - list_semesters              |             | - GET  /docs (Swagger UI)     |
+| - list_exam_types             |             | - GET  /openapi.json          |
+| - search_questions            |             | - GET  /mcp (SSE Endpoint)    |
+| - collect_questions           |             | - POST /api/search            |
+| - get_pdf_file                |             | - POST /api/collect           |
+| - preview_question_page       |             | - GET  /api/files             |
+| - list_collected_files        |             | - GET  /api/files/{id}/pages  |
+| - get_collection_summary      |             | - GET  /api/files/{id}/down.. |
++-------------------------------+             +-------------------------------+
 ```
 
 ---
@@ -81,7 +70,7 @@ diu-question/
 ├── api.py                    # FastAPI REST API & OpenAPI 3.1 server
 ├── server.py                 # Multi-transport launcher (stdio, http, sse)
 ├── config.py                 # Central configuration and environment loader
-├── Dockerfile                # Production container build definition
+├── Dockerfile                # Production multi-stage Docker build
 ├── docker-compose.yml        # Multi-container orchestration
 ├── pyproject.toml            # Project metadata and test configuration
 ├── requirements.txt          # Production dependencies
@@ -110,10 +99,11 @@ diu-question/
 │   ├── models.py             # Data entities & schemas
 │   └── repository.py         # SQLite database operations
 │
-└── tests/                    # Automated test suite (34 passing tests)
-    ├── test_api.py           # REST endpoints and OpenAPI tests
+└── tests/                    # Automated test suite (36 passing tests)
+    ├── test_api.py           # REST endpoints, Root, and OpenAPI tests
     ├── test_downloader.py    # Download validation tests
     ├── test_filters.py       # Semester & exam normalization tests
+    ├── test_hf_app.py        # Application integration tests
     ├── test_mcp.py           # MCP tool execution tests
     ├── test_preview_and_storage.py # Vision preview & LRU storage tests
     └── test_scraper.py       # Scraper and parser tests
@@ -121,9 +111,9 @@ diu-question/
 
 ---
 
-## Setup & Installation
+## Setup & Local Installation
 
-### 1. Clone & Navigate
+### 1. Clone the Repository
 ```bash
 git clone https://github.com/mahmudulhasantasin/diu-question-access.git
 cd diu-question-access
@@ -131,7 +121,7 @@ cd diu-question-access
 
 ### 2. Environment Setup
 ```bash
-# Windows
+# Windows (PowerShell)
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 
@@ -145,8 +135,8 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4. Configuration
-Create a `.env` file if custom ports or directories are required:
+### 4. Configuration (Optional)
+Create a `.env` file to configure custom host, port, or storage limits:
 ```env
 DIU_SERVER_HOST=0.0.0.0
 DIU_SERVER_PORT=8000
@@ -156,45 +146,81 @@ DIU_MAX_STORAGE_MB=50
 
 ---
 
-## Verification & Testing
+## Running the Automated Tests
 
-Execute the automated test suite covering all services, models, and endpoints:
+Execute the 36 automated tests covering all scrapers, downloaders, MCP tools, and REST endpoints:
 ```bash
 python -m pytest -v
 ```
 
 ---
 
-## Execution Options
+## Running the Server
 
-### Option 1: Local MCP stdio Mode
-Used for desktop applications such as Claude Desktop and Cursor IDE:
+### 1. Local MCP stdio Mode (Claude Desktop / Cursor)
+Used for local desktop AI assistants:
 ```bash
 python server.py --transport stdio
 ```
 
-### Option 2: Production REST API Mode
-Used for ChatGPT Custom GPT Actions, web frontends, and cloud hosting:
+### 2. Production REST & MCP SSE Mode
+Runs FastAPI with interactive Swagger UI and mounted MCP SSE:
 ```bash
 python server.py --transport http --host 0.0.0.0 --port 8000
 ```
-Interactive API documentation will be available at:
-* Swagger UI: `http://localhost:8000/docs`
-* OpenAPI Schema: `http://localhost:8000/openapi.json`
-* Health Endpoint: `http://localhost:8000/health`
-* MCP SSE Endpoint: `http://localhost:8000/mcp`
+Interactive endpoints:
+* **Root Index**: `http://localhost:8000/`
+* **Swagger UI Docs**: `http://localhost:8000/docs`
+* **OpenAPI 3.1 Schema**: `http://localhost:8000/openapi.json`
+* **Health Check**: `http://localhost:8000/health`
+* **MCP SSE Endpoint**: `http://localhost:8000/mcp`
 
-### Option 3: Docker Deployment
+### 3. Docker Container
 ```bash
 docker compose up -d --build
 ```
 
 ---
 
-## Client Integration
+## Free Cloud Deployment (Render)
 
-### Claude Desktop Configuration
-Add the server entry to your Claude Desktop config file:
+Deploy this service online for **free** on Render:
+
+1. Create a free account at [Render.com](https://render.com).
+2. Click **New +** $\to$ **Web Service**.
+3. Connect your GitHub repository: `diu-question-access`.
+4. Render automatically detects the `Dockerfile` in the root:
+   * **Runtime**: `Docker`
+   * **Instance Type**: `Free`
+5. Click **Deploy Web Service**.
+6. Render builds the container, binds to port `8000`, and passes the health check.
+7. You will receive a permanent HTTPS URL, for example: `https://diu-question-access.onrender.com`.
+
+---
+
+## Connecting with AI Clients
+
+### 1. ChatGPT (Custom GPT Actions)
+Connect the online Render service to ChatGPT:
+
+1. Open ChatGPT and go to **Explore GPTs** $\to$ **Create a GPT** $\to$ **Configure**.
+2. Scroll to the bottom and click **Create new action**.
+3. In the **Import from URL** input, enter your Render OpenAPI schema URL:
+   ```
+   https://<your-render-service-name>.onrender.com/openapi.json
+   ```
+4. Click **Import**. ChatGPT will immediately configure all endpoints:
+   * Searching questions by department, course, and semester.
+   * Transcribing question text directly into the chat.
+   * Previewing high-resolution PNG page images for diagrams, math equations, and circuit schematics.
+   * Providing direct PDF download links.
+5. In GPT Instructions, specify:
+   > "You are an assistant for Daffodil International University students. Use the DIU Question actions to search past question papers, summarize them, and provide page preview images whenever users ask about diagrams or specific questions."
+
+---
+
+### 2. Claude Desktop Integration
+Add the server entry to your Claude Desktop configuration file:
 
 * **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 * **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
@@ -215,20 +241,13 @@ Add the server entry to your Claude Desktop config file:
 }
 ```
 
-### ChatGPT Actions Configuration
-1. Run the server in HTTP mode on a public URL (e.g., using Render, Railway, or a tunnel).
-2. Go to **Explore GPTs** $\to$ **Create a GPT** $\to$ **Configure**.
-3. Under **Actions**, click **Create new action**.
-4. Select **Import from URL** and paste: `https://your-server-domain/openapi.json`.
-5. ChatGPT will automatically configure the endpoints for searching questions, reviewing text transcriptions, streaming diagrams, and downloading original papers.
-
 ---
 
 ## MCP Tools Reference (10 Tools)
 
 | Tool Name | Parameters | Description |
 | :--- | :--- | :--- |
-| `list_departments` | `force_refresh: bool` | Returns all academic departments discovered from OurDIU. |
+| `list_departments` | `force_refresh: bool` | Returns all academic departments discovered dynamically from OurDIU. |
 | `list_courses` | `department: str, force_refresh: bool` | Returns courses under a specific department. |
 | `list_semesters` | `department: str, course: str` | Lists available semesters with existing papers for the course. |
 | `list_exam_types` | `department: str, course: str` | Lists exam categories (Midterm, Final, Quiz) for the course. |
@@ -245,15 +264,19 @@ Add the server entry to your Claude Desktop config file:
 
 | Method | Route | Description |
 | :--- | :--- | :--- |
+| `GET` | `/` | Service root status & documentation index. |
+| `HEAD` | `/` | Cloud orchestrator health check probe. |
 | `GET` | `/health` | Service health status. |
-| `GET` | `/docs` | Swagger interactive documentation. |
+| `GET` | `/docs` | Interactive Swagger documentation. |
 | `GET` | `/openapi.json` | OpenAPI 3.1 specification for ChatGPT Actions. |
+| `GET` | `/mcp` | MCP Server-Sent Events (SSE) endpoint. |
 | `GET` | `/api/departments` | Discovered department list. |
 | `GET` | `/api/courses` | Department courses by query parameter. |
 | `GET` | `/api/semesters` | Available semesters for a given course. |
 | `GET` | `/api/exam-types` | Available exam categories for a given course. |
 | `POST` | `/api/search` | Search papers without local disk storage. |
 | `POST` | `/api/collect` | Collect papers and record database entries. |
+| `GET` | `/api/files` | List collected/indexed question files. |
 | `GET` | `/api/files/{file_id}` | Retrieve metadata and question text. |
 | `GET` | `/api/files/{file_id}/download` | Stream binary PDF directly to browser/client. |
 | `GET` | `/api/files/{file_id}/pages/{page}` | **Stream page as PNG image for browser/vision AI.** |
@@ -263,4 +286,4 @@ Add the server entry to your Claude Desktop config file:
 
 ## License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+This project is open-source and licensed under the MIT License.
