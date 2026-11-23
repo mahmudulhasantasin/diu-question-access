@@ -238,6 +238,21 @@ python server.py --transport stdio
 
 ---
 
+## ⚖️ Disclaimer & Attribution (দায়মুক্তি ও কৃতজ্ঞতা স্বীকার)
+
+### 1. Attribution & Source Credits
+This project programmatically indexes public examination question papers collected and archived by the student community at **[OurDIU](https://ourdiu.com/)**. We express our sincere gratitude and appreciation to the OurDIU team, student contributors, and class representatives (CRs) for voluntarily archiving these academic resources.
+
+### 2. Unofficial & Educational Purpose (Fair Use)
+- **Non-Affiliation**: This is an **independent, unofficial open-source project**. It is not officially affiliated with, authorized, maintained, sponsored, or endorsed by Daffodil International University (DIU) or OurDIU.
+- **Academic & Non-Commercial Use**: This project is developed strictly for **academic study, research, accessibility, and educational assistance** under fair use principles. No content is commercialized or sold.
+- **Intellectual Property & Copyrights**: All copyrights to examination question papers, course curriculum, and institutional trademarks belong to Daffodil International University and the respective course instructors. This tool acts solely as an intelligent search, accessibility, and indexing interface.
+
+### 3. Content Removal & Takedown Policy
+If you are an authorized representative of Daffodil International University, a faculty member, or a copyright owner and wish to request the removal or restriction of any specific question paper or indexed link, please open an Issue on this repository or contact the maintainer. We respect intellectual property rights and will honor legitimate removal requests promptly.
+
+---
+
 ## 📜 License
 
 This project is open-source and licensed under the [MIT License](LICENSE).
