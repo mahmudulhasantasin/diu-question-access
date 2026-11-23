@@ -11,6 +11,20 @@ def client():
         yield test_client
 
 
+def test_root_endpoint(client):
+    # Test GET /
+    res_get = client.get("/")
+    assert res_get.status_code == 200
+    data = res_get.json()
+    assert data["status"] == "online"
+    assert "docs_url" in data
+    assert "openapi_url" in data
+
+    # Test HEAD / (Render health check probe)
+    res_head = client.head("/")
+    assert res_head.status_code == 200
+
+
 def test_health_check(client):
     response = client.get("/health")
     assert response.status_code == 200

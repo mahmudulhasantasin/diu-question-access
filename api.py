@@ -85,8 +85,22 @@ def create_app() -> FastAPI:
     )
 
     # -------------------------------------------------------------
-    # Health Check (Kubernetes, Docker, Cloud Run, Render, Railway)
+    # Root & Health Check (Render, Cloud Run, Kubernetes, Docker)
     # -------------------------------------------------------------
+    @app.get("/", tags=["Health"])
+    @app.head("/", tags=["Health"])
+    async def root():
+        """Root endpoint returning service status and documentation links."""
+        return {
+            "status": "online",
+            "service": SERVER_NAME,
+            "version": SERVER_VERSION,
+            "docs_url": "/docs",
+            "openapi_url": "/openapi.json",
+            "health_url": "/health",
+            "mcp_url": "/mcp",
+        }
+
     @app.get("/health", response_model=HealthResponse, tags=["Health"])
     async def health_check():
         """Health check endpoint for cloud monitoring and container orchestrators."""

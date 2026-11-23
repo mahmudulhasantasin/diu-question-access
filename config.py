@@ -36,7 +36,7 @@ SERVER_NAME = "DIU Question MCP"
 SERVER_VERSION = "1.0.0"
 DEFAULT_TRANSPORT = os.getenv("DIU_MCP_TRANSPORT", "stdio")
 SERVER_HOST = os.getenv("DIU_SERVER_HOST", "127.0.0.1")
-SERVER_PORT = int(os.getenv("DIU_SERVER_PORT", "8000"))
+SERVER_PORT = int(os.getenv("PORT", os.getenv("DIU_SERVER_PORT", "8000")))
 
 # Logging
 LOG_LEVEL = os.getenv("DIU_LOG_LEVEL", "INFO")

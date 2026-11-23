@@ -8,7 +8,7 @@ def test_gradio_app_structure():
     """Verify that app is a FastAPI instance with Gradio mounted."""
     assert app is not None
     # Check that FastAPI routes still include Swagger, OpenAPI, and health
-    routes = [route.path for route in app.routes]
+    routes = [route.path for route in app.routes if hasattr(route, "path")]
     assert "/docs" in routes
     assert "/openapi.json" in routes
     assert "/health" in routes
