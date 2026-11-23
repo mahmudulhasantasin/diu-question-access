@@ -107,6 +107,12 @@ class DatabaseRepository:
                 );
             """)
 
+            # Auto-migration: ensure question_text column exists in existing pdf_files tables
+            cursor = conn.execute("PRAGMA table_info(pdf_files)")
+            cols = [c[1] for c in cursor.fetchall()]
+            if "question_text" not in cols and len(cols) > 0:
+                conn.execute("ALTER TABLE pdf_files ADD COLUMN question_text TEXT")
+
     # ---------------- Department Operations ----------------
     def upsert_departments(self, departments: List[Department]) -> None:
         with self._get_connection() as conn:
