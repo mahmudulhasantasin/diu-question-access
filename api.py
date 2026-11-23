@@ -53,7 +53,7 @@ class MCPProxyMiddleware:
     """Pure ASGI middleware to normalize paths and host headers for the MCP SSE sub-app.
 
     Avoids BaseHTTPMiddleware issues with streaming SSE, rewrites /mcp to /mcp/,
-    and normalizes Host to localhost so FastMCP DNS rebinding allows cloud proxies (Render).
+    and normalizes Host to localhost:8000 so FastMCP DNS rebinding allows cloud proxies (Render).
     """
 
     def __init__(self, app):
@@ -67,7 +67,7 @@ class MCPProxyMiddleware:
             new_headers = []
             for k, v in headers:
                 if k.lower() == b"host":
-                    new_headers.append((b"host", b"localhost"))
+                    new_headers.append((b"host", b"localhost:8000"))
                 elif k.lower() == b"origin":
                     continue
                 else:
