@@ -4,7 +4,13 @@ import base64
 import json
 import logging
 from typing import List, Union, Optional, Dict, Any
-from mcp.server.mcpserver import MCPServer
+try:
+    from mcp.server.mcpserver import MCPServer
+except ImportError:
+    try:
+        from mcp.server.fastmcp import FastMCP as MCPServer
+    except ImportError:
+        from mcp.server import Server as MCPServer
 import mcp.types as types
 from config import SERVER_NAME
 from services.collection_service import CollectionService
