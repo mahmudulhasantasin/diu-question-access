@@ -18,7 +18,10 @@ dependencies = [
     "beautifulsoup4>=4.13.0",
     "pydantic>=2.10.0",
     "python-dotenv>=1.0.1",
+    "fastapi>=0.115.0",
     "uvicorn>=0.30.0",
+    "pypdfium2>=0.20.0",
+    "pillow>=10.0.0",
 ]
 
 [project.optional-dependencies]
@@ -26,9 +29,16 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
 ]
+ui = [
+    "gradio>=6.0.0",
+]
 
 [project.scripts]
 diu-question-mcp = "server:main"
+
+[tool.setuptools]
+packages = ["database", "downloader", "mcp_server", "scraper", "services"]
+py-modules = ["api", "app", "config", "server"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

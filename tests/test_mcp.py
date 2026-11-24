@@ -49,7 +49,6 @@ def test_mcp_tools_registration(mock_env):
     app = mock_env["app"]
     # FastMCP/MCPServer stores tools in its list_tools or call_tool
     assert app is not None
-    # Verify tool decorator added all 9 tools
     expected_tools = [
         "list_departments",
         "list_courses",
@@ -60,9 +59,11 @@ def test_mcp_tools_registration(mock_env):
         "list_collected_files",
         "get_pdf_file",
         "get_question_collection_summary",
+        "preview_question_page",
     ]
     # Check tool names registered on MCPServer
     tool_names = [t.name for t in asyncio_run(app.list_tools())]
+    assert len(tool_names) == 10
     for expected in expected_tools:
         assert expected in tool_names, f"Tool '{expected}' should be registered."
 

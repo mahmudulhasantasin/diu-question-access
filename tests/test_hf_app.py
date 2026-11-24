@@ -16,6 +16,8 @@ def test_gradio_app_structure():
     assert "/api/search" in routes
     assert "/api/collect" in routes
     assert "/api/files/{file_id}/download" in routes
+    # MCP SSE app must be mounted exactly once (regression: duplicate /mcp mount).
+    assert routes.count("/mcp") == 1
 
 
 @pytest.mark.asyncio

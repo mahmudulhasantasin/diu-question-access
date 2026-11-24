@@ -148,7 +148,6 @@ with gr.Blocks(title="DIU Question MCP & REST Server") as demo:
                 inputs=[dept_input, course_input, semester_input, exam_type_input],
                 outputs=[search_results_md, preview_file_id],
             )
-
             preview_btn.click(
                 fn=preview_page_ui,
                 inputs=[preview_file_id, page_num_input],
@@ -180,14 +179,11 @@ with gr.Blocks(title="DIU Question MCP & REST Server") as demo:
                 """
             )
 
-# 4. Attach FastAPI REST, OpenAPI & MCP routes directly onto demo.app
+# 4. Attach FastAPI REST, OpenAPI & MCP routes directly onto demo.app.
+# NOTE: `api_app` already mounts the MCP SSE app at /mcp, so do not mount it again.
 for r in api_app.routes:
     if hasattr(r, "path") and r.path not in [x.path for x in demo.app.routes if hasattr(x, "path")]:
         demo.app.routes.append(r)
-
-from mcp_server.tools import create_mcp_server
-mcp_server_instance = create_mcp_server(service=service)
-demo.app.mount("/mcp", mcp_server_instance.sse_app())
 
 # Expose app for ASGI servers and launch demo for Hugging Face Spaces
 app = demo.app

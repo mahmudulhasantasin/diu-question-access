@@ -72,6 +72,7 @@ class PreviewService:
                     await client.aclose()
 
         # 3. Render page to PNG using pypdfium2 in-memory
+        doc = None
         try:
             doc = pypdfium2.PdfDocument(pdf_bytes)
             total_pages = len(doc)
@@ -89,3 +90,9 @@ class PreviewService:
         except Exception as exc:
             logger.error(f"Error rendering PDF page {page_number} for {file_id}: {exc}")
             raise ValueError(f"Failed to render PDF page image: {exc}")
+        finally:
+            if doc is not None:
+                try:
+                    doc.close()
+                except Exception:
+                    pass

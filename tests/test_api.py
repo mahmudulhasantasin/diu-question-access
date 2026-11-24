@@ -49,6 +49,14 @@ def test_mcp_jsonrpc_streamable_http(client):
     tools_data = tools_res.json()
     assert "tools" in tools_data["result"]
     assert len(tools_data["result"]["tools"]) == 10
+    tools_by_name = {t["name"]: t for t in tools_data["result"]["tools"]}
+    schema = tools_by_name["search_questions"]["inputSchema"]
+    assert schema.get("type") == "object"
+    assert "department" in schema.get("properties", {})
+    assert "course" in schema.get("properties", {})
+    # Every tool must expose a non-empty parameter schema.
+    for name, tool in tools_by_name.items():
+        assert tool["inputSchema"].get("properties"), f"Tool '{name}' is missing its input schema."
 
     # 3. Test tools/call (used by Gemini & Streamable HTTP clients)
     call_res = client.post("/mcp", json={

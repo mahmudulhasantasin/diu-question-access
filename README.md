@@ -220,6 +220,12 @@ cd diu-question-access
 python -m venv .venv
 source .venv/bin/activate  # or .\.venv\Scripts\Activate.ps1 on Windows
 pip install -r requirements.txt
+
+# Optional: install as a package (provides the `diu-question-mcp` command)
+pip install -e .
+
+# Optional: Gradio web UI dependencies for app.py / Hugging Face Spaces
+pip install -e ".[ui]"
 ```
 
 ### 2. Automated Tests (38 Tests Passing 100%)

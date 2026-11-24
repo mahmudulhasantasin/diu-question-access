@@ -18,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
-from config import SERVER_NAME, SERVER_VERSION, LOG_LEVEL
+from config import SERVER_NAME, SERVER_VERSION
 from database.models import CollectionSummary
 from services.collection_service import CollectionService
 from services.preview_service import PreviewService
@@ -184,7 +184,15 @@ def create_app() -> FastAPI:
             tools = await mcp_app_instance.list_tools()
             tools_list = []
             for t in tools:
-                schema = getattr(t, "inputSchema", getattr(t, "parameters", None))
+                # mcp >= 2 uses `input_schema` (aliased as inputSchema in JSON),
+                # older clients/servers use `parameters`. Support all variants.
+                schema = (
+                    getattr(t, "input_schema", None)
+                    or getattr(t, "inputSchema", None)
+                    or getattr(t, "parameters", None)
+                )
+                if hasattr(schema, "model_dump"):
+                    schema = schema.model_dump(by_alias=True, exclude_none=True)
                 if schema is None or not isinstance(schema, dict):
                     schema = {"type": "object", "properties": {}}
                 tools_list.append({

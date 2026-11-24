@@ -3,7 +3,7 @@
 import logging
 from pathlib import Path
 from typing import Optional, List
-from database.models import Department, Course, Semester, ExamType, PDFMetadata
+from database.models import Department, Course, Semester, ExamType, PDFMetadata  # noqa: F401 (public API)
 from database.repository import DatabaseRepository
 
 logger = logging.getLogger("diu_mcp.services.cache")
